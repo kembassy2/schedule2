@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="B조휴무관리">
+<meta name="apple-mobile-web-app-title" content="B조휴무">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -231,6 +231,15 @@
   .stat-mini .l{font-size:11.5px;color:var(--ink-soft);font-weight:600;}
   .stat-mini .v{font-size:17px;font-weight:800;margin-top:2px;}
 
+  .top-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 14px 2px;}
+  .top-stats .tcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:8px 10px;}
+  .top-stats .tcard.highlight{background:var(--accent-soft);border-color:var(--accent);}
+  .top-stats .tcard .l{font-size:10px;color:var(--ink-soft);font-weight:700;}
+  .top-stats .tcard .v{font-size:14.5px;font-weight:800;margin-top:2px;}
+  .top-stats .tcard.highlight .v{color:var(--accent-strong);}
+  .top-stats .tcard .sub{font-size:9px;color:var(--ink-soft);margin-top:2px;line-height:1.3;}
+  .top-stats .tcard.wide{grid-column:1 / -1;}
+
   /* Board: employee picker + mini calendar */
   .emp-select-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
   .emp-select-row select{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:var(--surface);font-weight:700;}
@@ -419,6 +428,8 @@
       <button id="m-nextMonth">›</button>
     </div>
   </div>
+
+  <div class="top-stats" id="topStats"></div>
 
   <main id="m-mainArea"></main>
 
@@ -1373,8 +1384,40 @@
   }
 
   // ---------- render dispatch ----------
+  function computeStats(){
+    const y=state.year, m=state.month, dim = daysInMonth(y,m);
+    let tue=0, wed=0, sat=0, sun=0, workdays=0;
+    for(let d=1; d<=dim; d++){
+      const c = classify(y,m,d);
+      if(c.dow===4) tue++;
+      if(c.dow===5) wed++;
+      if(c.dow===6) sat++;
+      if(c.dow===0) sun++;
+      if(!c.isAutoOff) workdays++;
+    }
+    const legal = state.monthData.legalHolidays.length;
+    const temp = state.monthData.tempHolidays.length;
+    const fixedTotal = tue+wed;
+    const comparePool = sat+sun+legal+temp;
+    const extraOff = Math.max(0, comparePool - fixedTotal);
+    return {tue,wed,fixedTotal,sat,sun,legal,temp,workdays,comparePool,extraOff};
+  }
+
+  function renderTopStats(){
+    const s = computeStats();
+    document.getElementById('topStats').innerHTML = `
+      <div class="tcard"><div class="l">목·금 정기휴무</div><div class="v">${s.fixedTotal}일</div><div class="sub">목 ${s.tue} · 금 ${s.wed}</div></div>
+      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legal}+대체${s.temp}=${s.comparePool}) − 목금${s.fixedTotal}</div></div>
+      <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
+      <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
+      <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
+      <div class="tcard wide"><div class="l">근무일 신청 규칙</div><div class="v" style="font-size:12.5px;">1일 최대 ${MAX_OFF_WORKDAY}명 휴무 (근무인원 최소 ${MIN_WORKING}명 유지)</div></div>
+    `;
+  }
+
   function render(){
     document.getElementById('m-monthLabel').textContent = `${state.year}년 ${state.month}월`;
+    renderTopStats();
     renderHolidayChips();
     renderRoster();
     if(state.activeTab==='signup') renderSignup();
@@ -1444,7 +1487,7 @@
     main.querySelectorAll('.fixedRm').forEach(btn=>btn.addEventListener('click', async ()=>{
       const d=parseInt(btn.dataset.day,10), idx=parseInt(btn.dataset.idx,10), key=dateKey(y,m,d);
       if(state.monthData.fixedOverrides[key]) delete state.monthData.fixedOverrides[key][idx];
-      await saveMonthData(); renderSignup();
+      await saveMonthData(); renderSignup(); renderTopStats();
     }));
     main.querySelectorAll('.fixedAddBtn').forEach(btn=>btn.addEventListener('click', async ()=>{
       const d=parseInt(btn.dataset.day,10);
@@ -1455,12 +1498,12 @@
       const idx=parseInt(nameSel.value,10), type=typeSel.value, key=dateKey(y,m,d);
       if(!state.monthData.fixedOverrides[key]) state.monthData.fixedOverrides[key]={};
       if(type==='정기휴무') delete state.monthData.fixedOverrides[key][idx]; else state.monthData.fixedOverrides[key][idx]=type;
-      await saveMonthData(); renderSignup();
+      await saveMonthData(); renderSignup(); renderTopStats();
     }));
     main.querySelectorAll('.rmSel').forEach(btn=>btn.addEventListener('click', async ()=>{
       const d=parseInt(btn.dataset.day,10), idx=parseInt(btn.dataset.idx,10), key=dateKey(y,m,d);
       state.monthData.selections[key] = (state.monthData.selections[key]||[]).filter(e=>e.idx!==idx);
-      await saveMonthData(); renderSignup();
+      await saveMonthData(); renderSignup(); renderTopStats();
     }));
     main.querySelectorAll('.addBtn').forEach(btn=>btn.addEventListener('click', async ()=>{
       const d=parseInt(btn.dataset.day,10);
@@ -1473,7 +1516,7 @@
       if(arr.length >= MAX_OFF_WORKDAY){ showToast('이미 10명이 신청했습니다.'); return; }
       if(!arr.some(e=>e.idx===idx)) arr.push({idx,type});
       state.monthData.selections[key] = arr;
-      await saveMonthData(); renderSignup();
+      await saveMonthData(); renderSignup(); renderTopStats();
     }));
   }
 
