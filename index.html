@@ -317,7 +317,7 @@
   <div class="topbar">
     <div>
       <p class="brand-eyebrow">TEAM SCHEDULE</p>
-      <h1>출퇴근 휴무신청 관리시트</h1>
+      <h1>B조 휴무신청 관리시트</h1>
     </div>
     <div class="month-nav">
       <button id="prevMonth" aria-label="이전 달">‹</button>
@@ -1057,7 +1057,7 @@
 
   function computePayroll(idx){
     const y=state.year, m=state.month, dim = daysInMonth(y,m);
-    let actualWorkDays = 0, holidayWorkDays = 0, substituteWorkedDays = 0, unpaidDays = 0;
+    let actualWorkDays = 0, holidayWorkDays = 0, substituteWorkedDays = 0, monthlyLeaveDays = 0, unpaidDays = 0;
     const weeksWithWork = new Set();
     const weeksWithSickLeave = new Set();
     for(let d=1; d<=dim; d++){
@@ -1074,8 +1074,11 @@
           actualWorkDays++;
           if(c.isLegal) holidayWorkDays++;
           weeksWithWork.add(weekKey);
+        } else if(type === '월차'){
+          // 월차: 일당은 지급하되 교통비는 미지급
+          monthlyLeaveDays++;
         } else {
-          // 정기휴무(기본값)·휴무·월차·병가·결근: 무급
+          // 정기휴무(기본값)·휴무·병가·결근: 무급
           unpaidDays++;
           if(type === '병가') weeksWithSickLeave.add(weekKey);
         }
@@ -1095,8 +1098,10 @@
         actualWorkDays++;
         if(c.isLegal) holidayWorkDays++;
         weeksWithWork.add(weekKey);
+      } else if(mine.type === '월차'){
+        monthlyLeaveDays++;
       } else {
-        unpaidDays++; // 휴무·월차·병가·결근
+        unpaidDays++; // 휴무·병가·결근
         if(mine.type === '병가') weeksWithSickLeave.add(weekKey);
       }
     }
@@ -1104,11 +1109,12 @@
     const regularWage = regularDays * PAY.dailyWage;
     const holidayWage = holidayWorkDays * PAY.dailyWage * PAY.holidayMultiplier;
     const substituteWage = substituteWorkedDays * PAY.dailyWage;
+    const monthlyLeaveWage = monthlyLeaveDays * PAY.dailyWage;
     const transport = (actualWorkDays + substituteWorkedDays) * PAY.transport;
     let eligibleWeeks = 0;
     weeksWithWork.forEach(wk => { if(!weeksWithSickLeave.has(wk)) eligibleWeeks++; });
     const weeklyAllowance = eligibleWeeks * PAY.weeklyAllowance;
-    const gross = regularWage + holidayWage + substituteWage + transport + weeklyAllowance;
+    const gross = regularWage + holidayWage + substituteWage + monthlyLeaveWage + transport + weeklyAllowance;
 
     const pension = gross * PAY.nationalPension;
     const health = gross * PAY.healthInsurance;
@@ -1120,7 +1126,7 @@
     const partialDeduction = employment;
     const netPartial = gross - partialDeduction;
 
-    return {actualWorkDays, holidayWorkDays, substituteWorkedDays, unpaidDays, regularDays, regularWage, holidayWage, substituteWage, transport, weeklyAllowance, gross,
+    return {actualWorkDays, holidayWorkDays, substituteWorkedDays, monthlyLeaveDays, unpaidDays, regularDays, regularWage, holidayWage, substituteWage, monthlyLeaveWage, transport, weeklyAllowance, gross,
       pension, health, longTerm, employment, fullDeduction, netFull, partialDeduction, netPartial};
   }
 
@@ -1128,9 +1134,9 @@
     const table = document.getElementById('payrollTable');
     let head;
     if(payrollMode === 'full'){
-      head = ['연번','직원','근무일','공휴일근무','대체근무','무급휴가','기본급','휴일가산(200%)','대체근무수당','교통비','주휴수당','지급총액','국민연금','건강보험','장기요양','고용보험','공제합계','차인지급액'];
+      head = ['연번','직원','근무일','공휴일근무','대체근무','월차','무급휴가','기본급','휴일가산(200%)','대체근무수당','월차수당','교통비','주휴수당','지급총액','국민연금','건강보험','장기요양','고용보험','공제합계','차인지급액'];
     } else {
-      head = ['연번','직원','근무일','공휴일근무','대체근무','무급휴가','기본급','휴일가산(200%)','대체근무수당','교통비','주휴수당','지급총액','고용보험','공제합계','차인지급액'];
+      head = ['연번','직원','근무일','공휴일근무','대체근무','월차','무급휴가','기본급','휴일가산(200%)','대체근무수당','월차수당','교통비','주휴수당','지급총액','고용보험','공제합계','차인지급액'];
     }
     let headHtml = '<thead><tr>' + head.map(h=>`<th>${h}</th>`).join('') + '</tr></thead>';
 
@@ -1140,9 +1146,9 @@
       const displayName = maskName(name);
       let cells;
       if(payrollMode === 'full'){
-        cells = [i+1, displayName, p.actualWorkDays+'일', p.holidayWorkDays+'일', p.substituteWorkedDays+'일', p.unpaidDays+'일', won(p.regularWage), won(p.holidayWage), won(p.substituteWage), won(p.transport), won(p.weeklyAllowance), won(p.gross), won(p.pension), won(p.health), won(p.longTerm), won(p.employment), won(p.fullDeduction), `<strong>${won(p.netFull)}</strong>`];
+        cells = [i+1, displayName, p.actualWorkDays+'일', p.holidayWorkDays+'일', p.substituteWorkedDays+'일', p.monthlyLeaveDays+'일', p.unpaidDays+'일', won(p.regularWage), won(p.holidayWage), won(p.substituteWage), won(p.monthlyLeaveWage), won(p.transport), won(p.weeklyAllowance), won(p.gross), won(p.pension), won(p.health), won(p.longTerm), won(p.employment), won(p.fullDeduction), `<strong>${won(p.netFull)}</strong>`];
       } else {
-        cells = [i+1, displayName, p.actualWorkDays+'일', p.holidayWorkDays+'일', p.substituteWorkedDays+'일', p.unpaidDays+'일', won(p.regularWage), won(p.holidayWage), won(p.substituteWage), won(p.transport), won(p.weeklyAllowance), won(p.gross), won(p.employment), won(p.employment), `<strong>${won(p.netPartial)}</strong>`];
+        cells = [i+1, displayName, p.actualWorkDays+'일', p.holidayWorkDays+'일', p.substituteWorkedDays+'일', p.monthlyLeaveDays+'일', p.unpaidDays+'일', won(p.regularWage), won(p.holidayWage), won(p.substituteWage), won(p.monthlyLeaveWage), won(p.transport), won(p.weeklyAllowance), won(p.gross), won(p.employment), won(p.employment), `<strong>${won(p.netPartial)}</strong>`];
       }
       body += '<tr>' + cells.map(c=>`<td>${c}</td>`).join('') + '</tr>';
     });
@@ -1154,16 +1160,16 @@
   function exportPayrollCsv(){
     const y=state.year, m=state.month;
     let head = payrollMode === 'full'
-      ? ['연번','직원','근무일','공휴일근무','대체근무','무급휴가','기본급','휴일가산(200%)','대체근무수당','교통비','주휴수당','지급총액','국민연금','건강보험','장기요양','고용보험','공제합계','차인지급액']
-      : ['연번','직원','근무일','공휴일근무','대체근무','무급휴가','기본급','휴일가산(200%)','대체근무수당','교통비','주휴수당','지급총액','고용보험','공제합계','차인지급액'];
+      ? ['연번','직원','근무일','공휴일근무','대체근무','월차','무급휴가','기본급','휴일가산(200%)','대체근무수당','월차수당','교통비','주휴수당','지급총액','국민연금','건강보험','장기요양','고용보험','공제합계','차인지급액']
+      : ['연번','직원','근무일','공휴일근무','대체근무','월차','무급휴가','기본급','휴일가산(200%)','대체근무수당','월차수당','교통비','주휴수당','지급총액','고용보험','공제합계','차인지급액'];
     let rows = [head];
     state.staffNames.forEach((name,i)=>{
       const p = computePayroll(i);
       const displayName = maskName(name);
       if(payrollMode === 'full'){
-        rows.push([i+1, displayName, p.actualWorkDays, p.holidayWorkDays, p.substituteWorkedDays, p.unpaidDays, Math.round(p.regularWage), Math.round(p.holidayWage), Math.round(p.substituteWage), p.transport, p.weeklyAllowance, Math.round(p.gross), Math.round(p.pension), Math.round(p.health), Math.round(p.longTerm), Math.round(p.employment), Math.round(p.fullDeduction), Math.round(p.netFull)]);
+        rows.push([i+1, displayName, p.actualWorkDays, p.holidayWorkDays, p.substituteWorkedDays, p.monthlyLeaveDays, p.unpaidDays, Math.round(p.regularWage), Math.round(p.holidayWage), Math.round(p.substituteWage), Math.round(p.monthlyLeaveWage), p.transport, p.weeklyAllowance, Math.round(p.gross), Math.round(p.pension), Math.round(p.health), Math.round(p.longTerm), Math.round(p.employment), Math.round(p.fullDeduction), Math.round(p.netFull)]);
       } else {
-        rows.push([i+1, displayName, p.actualWorkDays, p.holidayWorkDays, p.substituteWorkedDays, p.unpaidDays, Math.round(p.regularWage), Math.round(p.holidayWage), Math.round(p.substituteWage), p.transport, p.weeklyAllowance, Math.round(p.gross), Math.round(p.employment), Math.round(p.employment), Math.round(p.netPartial)]);
+        rows.push([i+1, displayName, p.actualWorkDays, p.holidayWorkDays, p.substituteWorkedDays, p.monthlyLeaveDays, p.unpaidDays, Math.round(p.regularWage), Math.round(p.holidayWage), Math.round(p.substituteWage), Math.round(p.monthlyLeaveWage), p.transport, p.weeklyAllowance, Math.round(p.gross), Math.round(p.employment), Math.round(p.employment), Math.round(p.netPartial)]);
       }
     });
     const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -1608,7 +1614,8 @@
   const PAY = { dailyWage:53800, transport:4000, weeklyAllowance:50000, holidayMultiplier:2.0,
     nationalPension:0.045, healthInsurance:0.03545, longTermCareOfHealth:0.1295, employmentInsurance:0.009 };
   // 대체: 정기휴무일 근무 시 정상 근무(일당+교통비), 그 대가로 쉬는 근무일은 무급
-  // 정기휴무(기본값)·휴무·월차·병가·결근: 일당·교통비 모두 미지급 (무급)
+  // 월차: 일당은 지급하되 교통비는 미지급
+  // 정기휴무(기본값)·휴무·병가·결근: 일당·교통비 모두 미지급 (무급)
   // 병가 발생 주는 주휴수당 제외 / 조퇴는 출근한 것으로 보아 정상 근무(일당+교통비) 처리
   function won(n){ return Math.round(n).toLocaleString('ko-KR')+'원'; }
   function maskName(name){
@@ -1618,7 +1625,7 @@
   }
   function computePayroll(idx){
     const y=state.year, m=state.month, dim=daysInMonth(y,m);
-    let actualWorkDays=0, holidayWorkDays=0, substituteWorkedDays=0, unpaidDays=0;
+    let actualWorkDays=0, holidayWorkDays=0, substituteWorkedDays=0, monthlyLeaveDays=0, unpaidDays=0;
     const weeksWithWork = new Set();
     const weeksWithSickLeave = new Set();
     for(let d=1; d<=dim; d++){
@@ -1629,7 +1636,8 @@
         const type = ov[idx] || '정기휴무';
         if(type === '대체'){ substituteWorkedDays++; weeksWithWork.add(weekKey); }
         else if(type === '조퇴'){ actualWorkDays++; if(c.isLegal) holidayWorkDays++; weeksWithWork.add(weekKey); }
-        else { unpaidDays++; if(type==='병가') weeksWithSickLeave.add(weekKey); } // 정기휴무 기본값·휴무·월차·병가·결근
+        else if(type === '월차'){ monthlyLeaveDays++; }
+        else { unpaidDays++; if(type==='병가') weeksWithSickLeave.add(weekKey); } // 정기휴무 기본값·휴무·병가·결근
         continue;
       }
       if(c.isTemp) continue;
@@ -1638,20 +1646,22 @@
       if(!mine){ actualWorkDays++; if(c.isLegal) holidayWorkDays++; weeksWithWork.add(weekKey); }
       else if(mine.type === '대체'){ unpaidDays++; }
       else if(mine.type === '조퇴'){ actualWorkDays++; if(c.isLegal) holidayWorkDays++; weeksWithWork.add(weekKey); }
-      else { unpaidDays++; if(mine.type==='병가') weeksWithSickLeave.add(weekKey); } // 휴무·월차·병가·결근
+      else if(mine.type === '월차'){ monthlyLeaveDays++; }
+      else { unpaidDays++; if(mine.type==='병가') weeksWithSickLeave.add(weekKey); } // 휴무·병가·결근
     }
     const regularDays = actualWorkDays - holidayWorkDays;
     const regularWage = regularDays * PAY.dailyWage;
     const holidayWage = holidayWorkDays * PAY.dailyWage * PAY.holidayMultiplier;
     const substituteWage = substituteWorkedDays * PAY.dailyWage;
+    const monthlyLeaveWage = monthlyLeaveDays * PAY.dailyWage;
     const transport = (actualWorkDays + substituteWorkedDays) * PAY.transport;
     let eligibleWeeks = 0;
     weeksWithWork.forEach(wk => { if(!weeksWithSickLeave.has(wk)) eligibleWeeks++; });
     const weeklyAllowance = eligibleWeeks * PAY.weeklyAllowance;
-    const gross = regularWage + holidayWage + substituteWage + transport + weeklyAllowance;
+    const gross = regularWage + holidayWage + substituteWage + monthlyLeaveWage + transport + weeklyAllowance;
     const pension = gross*PAY.nationalPension, health=gross*PAY.healthInsurance, longTerm=health*PAY.longTermCareOfHealth, employment=gross*PAY.employmentInsurance;
     const fullDeduction = pension+health+longTerm+employment;
-    return {actualWorkDays,holidayWorkDays,substituteWorkedDays,unpaidDays,regularWage,holidayWage,substituteWage,transport,weeklyAllowance,gross,
+    return {actualWorkDays,holidayWorkDays,substituteWorkedDays,monthlyLeaveDays,unpaidDays,regularWage,holidayWage,substituteWage,monthlyLeaveWage,transport,weeklyAllowance,gross,
       pension,health,longTerm,employment,fullDeduction,netFull:gross-fullDeduction,netPartial:gross-employment};
   }
   function renderPayroll(){
@@ -1667,10 +1677,12 @@
         <summary><span class="pay-name">${maskName(name)}</span><span class="pay-net">${won(net)}</span></summary>
         <div class="pay-detail">
           <div class="pay-row"><span>근무일 / 공휴일근무</span><strong>${p.actualWorkDays}일 / ${p.holidayWorkDays}일</strong></div>
-          <div class="pay-row"><span>대체근무 / 무급휴가</span><strong>${p.substituteWorkedDays}일 / ${p.unpaidDays}일</strong></div>
+          <div class="pay-row"><span>대체근무 / 월차</span><strong>${p.substituteWorkedDays}일 / ${p.monthlyLeaveDays}일</strong></div>
+          <div class="pay-row"><span>무급휴가</span><strong>${p.unpaidDays}일</strong></div>
           <div class="pay-row"><span>기본급</span><strong>${won(p.regularWage)}</strong></div>
           <div class="pay-row"><span>휴일가산(200%)</span><strong>${won(p.holidayWage)}</strong></div>
           <div class="pay-row"><span>대체근무수당</span><strong>${won(p.substituteWage)}</strong></div>
+          <div class="pay-row"><span>월차수당</span><strong>${won(p.monthlyLeaveWage)}</strong></div>
           <div class="pay-row"><span>교통비</span><strong>${won(p.transport)}</strong></div>
           <div class="pay-row"><span>주휴수당</span><strong>${won(p.weeklyAllowance)}</strong></div>
           <div class="pay-row"><span>지급총액</span><strong>${won(p.gross)}</strong></div>
