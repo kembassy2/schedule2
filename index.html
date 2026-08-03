@@ -359,7 +359,7 @@
     <span><i style="background:var(--fixed-soft);border:1px solid var(--fixed)"></i>목·금·대체휴일: 전원 자동 휴무 (사유 개별 변경 가능)</span>
     <span><i style="background:var(--legal-soft);border:1px solid var(--legal)"></i>법정공휴일: 표시만, 개별 신청 필요</span>
     <span><i style="background:var(--accent-soft);border:1px solid var(--accent)"></i>월차·조퇴·대체·병가·결근 개별 신청</span>
-    <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>근무인원 5명 미만 경고</span>
+    <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>근무인원 제한 없음 (전원 휴무 가능)</span>
   </div>
 
   <div id="tab-signup">
@@ -373,7 +373,7 @@
         <table class="sheet-table" id="sheetTable"></table>
       </div>
     </div>
-    <p class="note">목·금요일은 기본적으로 전원 정기휴무이며, 필요 시 직원별로 월차·조퇴·대체·병가·결근 사유로 개별 변경할 수 있습니다. 목·금·대체휴일 외의 날짜(법정공휴일 포함)는 근무일로 취급되어 직원별로 사유를 선택해 휴무를 신청하며, 날짜당 최대 10명까지 신청 가능 — 근무인원 최소 5명을 유지하도록 설계되어 있습니다.</p>
+    <p class="note">목·금요일은 기본적으로 전원 정기휴무이며, 필요 시 직원별로 월차·조퇴·대체·병가·결근 사유로 개별 변경할 수 있습니다. 목·금·대체휴일 외의 날짜(법정공휴일 포함)는 근무일로 취급되어 직원별로 사유를 선택해 휴무를 신청하며, 날짜당 최대 15명(전원)까지 신청 가능합니다 — 근무인원 최소 인원 제한은 없습니다.</p>
   </div>
 
   <div id="tab-board" style="display:none;">
@@ -382,7 +382,7 @@
       <button class="btn ghost" id="printBtn">인쇄</button>
     </div>
     <div id="boardBlocks"></div>
-    <p class="note">회색 셀 = 목·금·대체휴일(전원, 사유 표기), 파란 셀 = 개별 신청 휴무(휴무/월차/조퇴/대체/병가/결근 표기). 맨 아래 행은 날짜별 근무 인원이며 5명 미만이면 빨간색으로 표시됩니다. 1~15일과 16일 이후는 표를 나누어 표기합니다.</p>
+    <p class="note">회색 셀 = 목·금·대체휴일(전원, 사유 표기), 파란 셀 = 개별 신청 휴무(휴무/월차/조퇴/대체/병가/결근 표기). 맨 아래 행은 날짜별 근무 인원을 보여줍니다 (최소 인원 제한 없음). 1~15일과 16일 이후는 표를 나누어 표기합니다.</p>
   </div>
 
   <div id="tab-payroll" style="display:none;">
@@ -473,8 +473,8 @@
 (function(){
   const DOW = ['일','월','화','수','목','금','토'];
   const STAFF_COUNT = 15;
-  const MAX_OFF_WORKDAY = 10;
-  const MIN_WORKING = 5;
+  const MAX_OFF_WORKDAY = 15;
+  const MIN_WORKING = 0;
   const LEAVE_TYPES = ['휴무','월차','조퇴','대체','병가','결근'];
   const FIXED_TYPES = ['정기휴무','월차','조퇴','대체','병가','결근'];
   const toast = document.getElementById('toast');
@@ -657,7 +657,7 @@
       <div class="stat-card"><div class="label">법정공휴일</div><div class="value">${s.legal}일</div></div>
       <div class="stat-card"><div class="label">대체휴일</div><div class="value">${s.temp}일</div></div>
       <div class="stat-card"><div class="label">근무일수</div><div class="value">${s.workdays}일</div></div>
-      <div class="stat-card accent"><div class="label">근무일 신청 규칙</div><div class="value">1일 최대 10명 휴무<br>(근무인원 최소 5명 유지)</div></div>
+      <div class="stat-card accent"><div class="label">근무일 신청 규칙</div><div class="value">1일 최대 15명(전원) 휴무<br>가능 (최소 인원 제한 없음)</div></div>
     `;
   }
 
@@ -823,7 +823,7 @@
         namesHtml = `<div class="name-chip-list">${chips}</div>
           <div class="add-row">
             <select class="addName" data-day="${d}" ${full?'disabled':''}>
-              <option value="">${full ? '정원(10명) 마감' : '직원 선택'}</option>
+              <option value="">${full ? '정원(15명) 마감' : '직원 선택'}</option>
               ${full ? '' : `<option value="all">전체 선택 (남은 ${remaining}명까지)</option>`}
               ${nameOptions}
             </select>
@@ -905,20 +905,20 @@
         const arr = state.monthData.selections[key] || [];
         if(nameSel.value === 'all'){
           const remaining = MAX_OFF_WORKDAY - arr.length;
-          if(remaining <= 0){ showToast('해당 날짜는 이미 10명이 신청했습니다.'); return; }
+          if(remaining <= 0){ showToast('해당 날짜는 이미 15명(전원) 신청했습니다.'); return; }
           const usedIdx = arr.map(e=>e.idx);
           const candidates = state.staffNames.map((_,i)=>i).filter(i=>!usedIdx.includes(i));
           const toAdd = candidates.slice(0, remaining);
           toAdd.forEach(idx => arr.push({idx, type}));
           state.monthData.selections[key] = arr;
           if(candidates.length > toAdd.length){
-            showToast(`정원(10명)으로 인해 ${toAdd.length}명만 '${type}' 적용했습니다.`);
+            showToast(`정원(15명)으로 인해 ${toAdd.length}명만 '${type}' 적용했습니다.`);
           } else {
             showToast(`${toAdd.length}명에게 '${type}' 적용했습니다.`);
           }
         } else {
           const idx = parseInt(nameSel.value,10);
-          if(arr.length >= MAX_OFF_WORKDAY){ showToast('해당 날짜는 이미 10명이 신청했습니다.'); return; }
+          if(arr.length >= MAX_OFF_WORKDAY){ showToast('해당 날짜는 이미 15명(전원) 신청했습니다.'); return; }
           if(!arr.some(e=>e.idx===idx)) arr.push({idx, type});
           state.monthData.selections[key] = arr;
         }
@@ -1266,8 +1266,8 @@
 (function(){
   const DOW = ['일','월','화','수','목','금','토'];
   const STAFF_COUNT = 15;
-  const MAX_OFF_WORKDAY = 10;
-  const MIN_WORKING = 5;
+  const MAX_OFF_WORKDAY = 15;
+  const MIN_WORKING = 0;
   const LEAVE_TYPES = ['휴무','월차','조퇴','대체','병가','결근'];
   const FIXED_TYPES = ['정기휴무','월차','조퇴','대체','병가','결근'];
   const toast = document.getElementById('m-toast');
@@ -1479,7 +1479,7 @@
       <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
       <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
       <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
-      <div class="tcard wide"><div class="l">근무일 신청 규칙</div><div class="v" style="font-size:12.5px;">1일 최대 ${MAX_OFF_WORKDAY}명 휴무 (근무인원 최소 ${MIN_WORKING}명 유지)</div></div>
+      <div class="tcard wide"><div class="l">근무일 신청 규칙</div><div class="v" style="font-size:12.5px;">1일 최대 ${MAX_OFF_WORKDAY}명(전원) 휴무 가능 (최소 인원 제한 없음)</div></div>
     `;
   }
 
@@ -1535,7 +1535,7 @@
         const remaining = MAX_OFF_WORKDAY - entries.length;
         body += `<div class="add-row">
           <select class="addName" data-day="${d}" ${full?'disabled':''}>
-            <option value="">${full?'정원(10명) 마감':'직원 선택'}</option>
+            <option value="">${full?'정원(15명) 마감':'직원 선택'}</option>
             ${full ? '' : `<option value="all">전체 선택 (남은 ${remaining}명까지)</option>`}
             ${state.staffNames.map((n,i)=>usedIdx.includes(i)?'':`<option value="${i}">${n}</option>`).join('')}
           </select>
@@ -1593,20 +1593,20 @@
       const arr = state.monthData.selections[key] || [];
       if(nameSel.value === 'all'){
         const remaining = MAX_OFF_WORKDAY - arr.length;
-        if(remaining <= 0){ showToast('이미 10명이 신청했습니다.'); return; }
+        if(remaining <= 0){ showToast('이미 15명(전원) 신청했습니다.'); return; }
         const usedIdx = arr.map(e=>e.idx);
         const candidates = state.staffNames.map((_,i)=>i).filter(i=>!usedIdx.includes(i));
         const toAdd = candidates.slice(0, remaining);
         toAdd.forEach(idx => arr.push({idx, type}));
         state.monthData.selections[key] = arr;
         if(candidates.length > toAdd.length){
-          showToast(`정원(10명)으로 인해 ${toAdd.length}명만 '${type}' 적용했습니다.`);
+          showToast(`정원(15명)으로 인해 ${toAdd.length}명만 '${type}' 적용했습니다.`);
         } else {
           showToast(`${toAdd.length}명에게 '${type}' 적용했습니다.`);
         }
       } else {
         const idx=parseInt(nameSel.value,10);
-        if(arr.length >= MAX_OFF_WORKDAY){ showToast('이미 10명이 신청했습니다.'); return; }
+        if(arr.length >= MAX_OFF_WORKDAY){ showToast('이미 15명(전원) 신청했습니다.'); return; }
         if(!arr.some(e=>e.idx===idx)) arr.push({idx,type});
         state.monthData.selections[key] = arr;
       }
