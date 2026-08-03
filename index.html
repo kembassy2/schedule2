@@ -804,6 +804,7 @@
           <div class="add-row">
             <select class="fixedAddName" data-day="${d}">
               <option value="">직원 선택</option>
+              <option value="all">전체 선택 (${STAFF_COUNT}명)</option>
               ${fixedNameOptions}
             </select>
             <select class="fixedAddType" data-day="${d}">${fixedTypeOptions}</select>
@@ -818,10 +819,12 @@
         const nameOptions = state.staffNames.map((n,i)=> usedIdx.includes(i) ? '' : `<option value="${i}">${n}</option>`).join('');
         const typeOptions = LEAVE_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('');
         const full = entries.length >= MAX_OFF_WORKDAY;
+        const remaining = MAX_OFF_WORKDAY - entries.length;
         namesHtml = `<div class="name-chip-list">${chips}</div>
           <div class="add-row">
             <select class="addName" data-day="${d}" ${full?'disabled':''}>
               <option value="">${full ? '정원(10명) 마감' : '직원 선택'}</option>
+              ${full ? '' : `<option value="all">전체 선택 (남은 ${remaining}명까지)</option>`}
               ${nameOptions}
             </select>
             <select class="addType" data-day="${d}" ${full?'disabled':''}>${typeOptions}</select>
@@ -861,12 +864,20 @@
         const nameSel = row.querySelector('.fixedAddName');
         const typeSel = row.querySelector('.fixedAddType');
         if(!nameSel.value){ showToast('직원을 선택해주세요.'); return; }
-        const idx = parseInt(nameSel.value,10);
         const type = typeSel.value;
         const key = dateKey(y,m,d);
         if(!state.monthData.fixedOverrides[key]) state.monthData.fixedOverrides[key] = {};
-        if(type === '정기휴무'){ delete state.monthData.fixedOverrides[key][idx]; }
-        else { state.monthData.fixedOverrides[key][idx] = type; }
+        if(nameSel.value === 'all'){
+          for(let idx=0; idx<STAFF_COUNT; idx++){
+            if(type === '정기휴무'){ delete state.monthData.fixedOverrides[key][idx]; }
+            else { state.monthData.fixedOverrides[key][idx] = type; }
+          }
+          showToast(`전체 ${STAFF_COUNT}명에게 '${type}' 적용했습니다.`);
+        } else {
+          const idx = parseInt(nameSel.value,10);
+          if(type === '정기휴무'){ delete state.monthData.fixedOverrides[key][idx]; }
+          else { state.monthData.fixedOverrides[key][idx] = type; }
+        }
         await saveMonthData();
         renderSheet(); renderRoster(); renderBoard(); renderPayroll();
       });
@@ -889,13 +900,28 @@
         const nameSel = row.querySelector('.addName');
         const typeSel = row.querySelector('.addType');
         if(!nameSel.value){ showToast('직원을 선택해주세요.'); return; }
-        const idx = parseInt(nameSel.value,10);
         const type = typeSel.value;
         const key = dateKey(y,m,d);
         const arr = state.monthData.selections[key] || [];
-        if(arr.length >= MAX_OFF_WORKDAY){ showToast('해당 날짜는 이미 10명이 신청했습니다.'); return; }
-        if(!arr.some(e=>e.idx===idx)) arr.push({idx, type});
-        state.monthData.selections[key] = arr;
+        if(nameSel.value === 'all'){
+          const remaining = MAX_OFF_WORKDAY - arr.length;
+          if(remaining <= 0){ showToast('해당 날짜는 이미 10명이 신청했습니다.'); return; }
+          const usedIdx = arr.map(e=>e.idx);
+          const candidates = state.staffNames.map((_,i)=>i).filter(i=>!usedIdx.includes(i));
+          const toAdd = candidates.slice(0, remaining);
+          toAdd.forEach(idx => arr.push({idx, type}));
+          state.monthData.selections[key] = arr;
+          if(candidates.length > toAdd.length){
+            showToast(`정원(10명)으로 인해 ${toAdd.length}명만 '${type}' 적용했습니다.`);
+          } else {
+            showToast(`${toAdd.length}명에게 '${type}' 적용했습니다.`);
+          }
+        } else {
+          const idx = parseInt(nameSel.value,10);
+          if(arr.length >= MAX_OFF_WORKDAY){ showToast('해당 날짜는 이미 10명이 신청했습니다.'); return; }
+          if(!arr.some(e=>e.idx===idx)) arr.push({idx, type});
+          state.monthData.selections[key] = arr;
+        }
         await saveMonthData();
         renderSheet(); renderStats(); renderRoster(); renderBoard(); renderPayroll();
       });
@@ -1492,7 +1518,7 @@
           exIdx.map(i=>`<span class="chip">${maskNameSheet(state.staffNames[i])}<span class="tag">${overrides[i]}</span><button data-day="${d}" data-idx="${i}" class="fixedRm">×</button></span>`).join('');
         body += `</div>
         <div class="add-row">
-          <select class="fixedAddName" data-day="${d}"><option value="">직원 선택</option>${state.staffNames.map((n,i)=>`<option value="${i}">${n}</option>`).join('')}</select>
+          <select class="fixedAddName" data-day="${d}"><option value="">직원 선택</option><option value="all">전체 선택 (${STAFF_COUNT}명)</option>${state.staffNames.map((n,i)=>`<option value="${i}">${n}</option>`).join('')}</select>
           <select class="fixedAddType" data-day="${d}">${FIXED_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
           <button class="fixedAddBtn" data-day="${d}">추가</button>
         </div>`;
@@ -1506,9 +1532,11 @@
           entries.map(e=>`<span class="chip">${maskNameSheet(state.staffNames[e.idx])}<span class="tag">${e.type}</span><button data-day="${d}" data-idx="${e.idx}" class="rmSel">×</button></span>`).join('');
         body += `</div>`;
         const full = entries.length >= MAX_OFF_WORKDAY;
+        const remaining = MAX_OFF_WORKDAY - entries.length;
         body += `<div class="add-row">
           <select class="addName" data-day="${d}" ${full?'disabled':''}>
             <option value="">${full?'정원(10명) 마감':'직원 선택'}</option>
+            ${full ? '' : `<option value="all">전체 선택 (남은 ${remaining}명까지)</option>`}
             ${state.staffNames.map((n,i)=>usedIdx.includes(i)?'':`<option value="${i}">${n}</option>`).join('')}
           </select>
           <select class="addType" data-day="${d}" ${full?'disabled':''}>${LEAVE_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
@@ -1537,9 +1565,17 @@
       const nameSel = cardBody.querySelector('.fixedAddName');
       const typeSel = cardBody.querySelector('.fixedAddType');
       if(!nameSel.value){ showToast('직원을 선택해주세요.'); return; }
-      const idx=parseInt(nameSel.value,10), type=typeSel.value, key=dateKey(y,m,d);
+      const type=typeSel.value, key=dateKey(y,m,d);
       if(!state.monthData.fixedOverrides[key]) state.monthData.fixedOverrides[key]={};
-      if(type==='정기휴무') delete state.monthData.fixedOverrides[key][idx]; else state.monthData.fixedOverrides[key][idx]=type;
+      if(nameSel.value === 'all'){
+        for(let idx=0; idx<STAFF_COUNT; idx++){
+          if(type==='정기휴무') delete state.monthData.fixedOverrides[key][idx]; else state.monthData.fixedOverrides[key][idx]=type;
+        }
+        showToast(`전체 ${STAFF_COUNT}명에게 '${type}' 적용했습니다.`);
+      } else {
+        const idx=parseInt(nameSel.value,10);
+        if(type==='정기휴무') delete state.monthData.fixedOverrides[key][idx]; else state.monthData.fixedOverrides[key][idx]=type;
+      }
       await saveMonthData(); renderSignup(); renderTopStats();
     }));
     main.querySelectorAll('.rmSel').forEach(btn=>btn.addEventListener('click', async ()=>{
@@ -1553,11 +1589,27 @@
       const nameSel = cardBody.querySelector('.addName');
       const typeSel = cardBody.querySelector('.addType');
       if(!nameSel.value){ showToast('직원을 선택해주세요.'); return; }
-      const idx=parseInt(nameSel.value,10), type=typeSel.value, key=dateKey(y,m,d);
+      const type=typeSel.value, key=dateKey(y,m,d);
       const arr = state.monthData.selections[key] || [];
-      if(arr.length >= MAX_OFF_WORKDAY){ showToast('이미 10명이 신청했습니다.'); return; }
-      if(!arr.some(e=>e.idx===idx)) arr.push({idx,type});
-      state.monthData.selections[key] = arr;
+      if(nameSel.value === 'all'){
+        const remaining = MAX_OFF_WORKDAY - arr.length;
+        if(remaining <= 0){ showToast('이미 10명이 신청했습니다.'); return; }
+        const usedIdx = arr.map(e=>e.idx);
+        const candidates = state.staffNames.map((_,i)=>i).filter(i=>!usedIdx.includes(i));
+        const toAdd = candidates.slice(0, remaining);
+        toAdd.forEach(idx => arr.push({idx, type}));
+        state.monthData.selections[key] = arr;
+        if(candidates.length > toAdd.length){
+          showToast(`정원(10명)으로 인해 ${toAdd.length}명만 '${type}' 적용했습니다.`);
+        } else {
+          showToast(`${toAdd.length}명에게 '${type}' 적용했습니다.`);
+        }
+      } else {
+        const idx=parseInt(nameSel.value,10);
+        if(arr.length >= MAX_OFF_WORKDAY){ showToast('이미 10명이 신청했습니다.'); return; }
+        if(!arr.some(e=>e.idx===idx)) arr.push({idx,type});
+        state.monthData.selections[key] = arr;
+      }
       await saveMonthData(); renderSignup(); renderTopStats();
     }));
   }
