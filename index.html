@@ -47,7 +47,7 @@
   .month-nav button:hover{background:var(--accent-soft);color:var(--accent-strong);}
   .month-label{min-width:96px;text-align:center;font-weight:700;font-size:16px;}
 
-  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;}
   .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;}
   .stat-card .label{font-size:11px;color:var(--ink-soft);font-weight:600;margin-bottom:4px;}
   .stat-card .value{font-size:20px;font-weight:800;}
@@ -657,7 +657,6 @@
       <div class="stat-card"><div class="label">법정공휴일</div><div class="value">${s.legal}일</div></div>
       <div class="stat-card"><div class="label">대체휴일</div><div class="value">${s.temp}일</div></div>
       <div class="stat-card"><div class="label">근무일수</div><div class="value">${s.workdays}일</div></div>
-      <div class="stat-card accent"><div class="label">근무일 신청 규칙</div><div class="value">1일 최대 15명(전원) 휴무<br>가능 (최소 인원 제한 없음)</div></div>
     `;
   }
 
@@ -824,7 +823,7 @@
           <div class="add-row">
             <select class="addName" data-day="${d}" ${full?'disabled':''}>
               <option value="">${full ? '정원(15명) 마감' : '직원 선택'}</option>
-              ${full ? '' : `<option value="all">전체 선택 (남은 ${remaining}명까지)</option>`}
+              ${full ? '' : `<option value="all">전체 선택</option>`}
               ${nameOptions}
             </select>
             <select class="addType" data-day="${d}" ${full?'disabled':''}>${typeOptions}</select>
@@ -1479,7 +1478,6 @@
       <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
       <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
       <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
-      <div class="tcard wide"><div class="l">근무일 신청 규칙</div><div class="v" style="font-size:12.5px;">1일 최대 ${MAX_OFF_WORKDAY}명(전원) 휴무 가능 (최소 인원 제한 없음)</div></div>
     `;
   }
 
@@ -1536,7 +1534,7 @@
         body += `<div class="add-row">
           <select class="addName" data-day="${d}" ${full?'disabled':''}>
             <option value="">${full?'정원(15명) 마감':'직원 선택'}</option>
-            ${full ? '' : `<option value="all">전체 선택 (남은 ${remaining}명까지)</option>`}
+            ${full ? '' : `<option value="all">전체 선택</option>`}
             ${state.staffNames.map((n,i)=>usedIdx.includes(i)?'':`<option value="${i}">${n}</option>`).join('')}
           </select>
           <select class="addType" data-day="${d}" ${full?'disabled':''}>${LEAVE_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('')}</select>
