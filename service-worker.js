@@ -1,4 +1,4 @@
-const CACHE_NAME = 'team-schedule-B-cache-v10';
+const CACHE_NAME = 'team-schedule-B-cache-v11';
 const APP_SHELL = [
   './',
   './index.html',
@@ -50,9 +50,12 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(req).then((cached) => {
       if (cached) return cached;
+      const isCacheableOrigin = req.url.startsWith(self.location.origin) ||
+        req.url.startsWith('https://fonts.googleapis.com') ||
+        req.url.startsWith('https://fonts.gstatic.com');
       return fetch(req)
         .then((res) => {
-          if (res && res.status === 200 && req.url.startsWith(self.location.origin)) {
+          if (res && (res.status === 200 || res.type === 'opaque') && isCacheableOrigin) {
             const resClone = res.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
           }
