@@ -622,7 +622,7 @@
 
   function computeStats(){
     const y=state.year, m=state.month, dim = daysInMonth(y,m);
-    let thu=0, fri=0, sat=0, sun=0, workdays=0;
+    let thu=0, fri=0, sat=0, sun=0, workdays=0, legalForCompare=0, tempForCompare=0;
     for(let d=1; d<=dim; d++){
       const c = classify(y,m,d);
       if(c.dow===4) thu++;
@@ -630,13 +630,18 @@
       if(c.dow===6) sat++;
       if(c.dow===0) sun++;
       if(!c.isAutoOff) workdays++;
+      // 토·일·목·금과 겹치는 공휴일/대체휴일은 이미 다른 항목에서 집계되므로,
+      // "추가 휴무일" 비교식에서는 중복 집계되지 않도록 제외한다 (법정공휴일/대체휴일 통계 카드 자체의 총 일수는 그대로 유지)
+      const isCountedElsewhere = c.isFixedWeekly || c.dow===0 || c.dow===6;
+      if(c.isLegal && !isCountedElsewhere) legalForCompare++;
+      if(c.isTemp && !isCountedElsewhere) tempForCompare++;
     }
     const legal = state.monthData.legalHolidays.length;
     const temp = state.monthData.tempHolidays.length;
     const fixedTotal = thu+fri;
-    const comparePool = sat+sun+legal+temp;
+    const comparePool = sat+sun+legalForCompare+tempForCompare;
     const extraOff = Math.max(0, comparePool - fixedTotal);
-    return {thu,fri,fixedTotal,sat,sun,legal,temp,workdays,comparePool,extraOff};
+    return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,extraOff};
   }
 
   function render(){
@@ -653,7 +658,7 @@
     const s = computeStats();
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="label">목·금 정기휴무</div><div class="value">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
-      <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legal}+대체${s.temp}=${s.comparePool}) − 목금${s.fixedTotal}</div></div>
+      <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}+대체${s.tempForCompare}=${s.comparePool}) − 목금${s.fixedTotal}<br>공휴일·대체는 토·일·목·금과 겹치지 않는 날짜만 집계</div></div>
       <div class="stat-card"><div class="label">법정공휴일</div><div class="value">${s.legal}일</div></div>
       <div class="stat-card"><div class="label">대체휴일</div><div class="value">${s.temp}일</div></div>
       <div class="stat-card"><div class="label">근무일수</div><div class="value">${s.workdays}일</div></div>
@@ -1453,28 +1458,31 @@
   // ---------- render dispatch ----------
   function computeStats(){
     const y=state.year, m=state.month, dim = daysInMonth(y,m);
-    let tue=0, wed=0, sat=0, sun=0, workdays=0;
+    let thu=0, fri=0, sat=0, sun=0, workdays=0, legalForCompare=0, tempForCompare=0;
     for(let d=1; d<=dim; d++){
       const c = classify(y,m,d);
-      if(c.dow===4) tue++;
-      if(c.dow===5) wed++;
+      if(c.dow===4) thu++;
+      if(c.dow===5) fri++;
       if(c.dow===6) sat++;
       if(c.dow===0) sun++;
       if(!c.isAutoOff) workdays++;
+      const isCountedElsewhere = c.isFixedWeekly || c.dow===0 || c.dow===6;
+      if(c.isLegal && !isCountedElsewhere) legalForCompare++;
+      if(c.isTemp && !isCountedElsewhere) tempForCompare++;
     }
     const legal = state.monthData.legalHolidays.length;
     const temp = state.monthData.tempHolidays.length;
-    const fixedTotal = tue+wed;
-    const comparePool = sat+sun+legal+temp;
+    const fixedTotal = thu+fri;
+    const comparePool = sat+sun+legalForCompare+tempForCompare;
     const extraOff = Math.max(0, comparePool - fixedTotal);
-    return {tue,wed,fixedTotal,sat,sun,legal,temp,workdays,comparePool,extraOff};
+    return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,extraOff};
   }
 
   function renderTopStats(){
     const s = computeStats();
     document.getElementById('topStats').innerHTML = `
-      <div class="tcard"><div class="l">목·금 정기휴무</div><div class="v">${s.fixedTotal}일</div><div class="sub">목 ${s.tue} · 금 ${s.wed}</div></div>
-      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legal}+대체${s.temp}=${s.comparePool}) − 목금${s.fixedTotal}</div></div>
+      <div class="tcard"><div class="l">목·금 정기휴무</div><div class="v">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
+      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}+대체${s.tempForCompare}=${s.comparePool}) − 목금${s.fixedTotal}<br>공휴일·대체는 토·일·목·금과 안 겹치는 날짜만 집계</div></div>
       <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
       <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
       <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
