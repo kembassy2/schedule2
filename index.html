@@ -326,7 +326,6 @@
     </div>
   </div>
 
-  <p class="note" style="margin:-8px 0 14px;">💾 입력한 데이터는 이 컴퓨터·브라우저에 자동 저장되어, 창을 닫았다가 다시 열어도 유지됩니다. 다른 컴퓨터/브라우저에서는 보이지 않으니, 여러 사람과 공유하려면 CSV로 내보내 전달하거나 Claude 안에서 이 화면을 열어 함께 사용하세요.</p>
   <div class="stats" id="statsRow"></div>
 
   <div class="panels">
@@ -639,9 +638,10 @@
     const legal = state.monthData.legalHolidays.length;
     const temp = state.monthData.tempHolidays.length;
     const fixedTotal = thu+fri;
-    const comparePool = sat+sun+legalForCompare+tempForCompare;
-    const extraOff = Math.max(0, comparePool - fixedTotal);
-    return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,extraOff};
+    const comparePool = sat+sun+legalForCompare;
+    const baseExtraOff = Math.max(0, comparePool - fixedTotal);
+    const extraOff = baseExtraOff + temp;
+    return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,baseExtraOff,extraOff};
   }
 
   function render(){
@@ -658,7 +658,7 @@
     const s = computeStats();
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="label">목·금 정기휴무</div><div class="value">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
-      <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}+대체${s.tempForCompare}=${s.comparePool}) − 목금${s.fixedTotal}<br>공휴일·대체는 토·일·목·금과 겹치지 않는 날짜만 집계</div></div>
+      <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금과 겹치지 않는 날짜만 집계</div></div>
       <div class="stat-card"><div class="label">법정공휴일</div><div class="value">${s.legal}일</div></div>
       <div class="stat-card"><div class="label">대체휴일</div><div class="value">${s.temp}일</div></div>
       <div class="stat-card"><div class="label">근무일수</div><div class="value">${s.workdays}일</div></div>
@@ -976,33 +976,37 @@
 
     let headRow1 = '<th rowspan="2" class="num-col">연번</th><th rowspan="2" class="name-col">직원</th>'
       + firstDays.map(dateHeaderCell).join('') + pad(maxCols - firstDays.length)
-      + '<th rowspan="2">총근무일</th>';
+      + '<th rowspan="2">총근무일</th><th rowspan="2">월차</th>';
     let headRow2 = secondDays.map(dateHeaderCell).join('') + pad(maxCols - secondDays.length);
 
     let body = '';
     for(let i=0;i<STAFF_COUNT;i++){
       let totalWorkDays = 0;
+      let monthlyLeaveCount = 0;
       for(let d=1; d<=dim; d++){
         const c = classify(y,m,d);
-        if(c.isFixedWeekly || c.isTemp){
-          // always off, regardless of leave-type reason tagged on the day
+        if(c.isFixedWeekly){
+          const overrides = state.monthData.fixedOverrides[c.key] || {};
+          if(overrides[i]==='월차') monthlyLeaveCount++;
           continue;
         }
+        if(c.isTemp) continue; // 대체휴일: 전원 휴무, 근무일 계산 제외
         const entries = state.monthData.selections[c.key] || [];
-        const hasLeave = entries.some(e=>e.idx===i);
-        if(!hasLeave) totalWorkDays++;
+        const mine = entries.find(e=>e.idx===i);
+        if(!mine) totalWorkDays++;
+        else if(mine.type === '월차') monthlyLeaveCount++;
       }
       const rowA = `<tr><th rowspan="2" class="num-col">${i+1}</th><th rowspan="2" class="name-col">${maskNameBoard(state.staffNames[i])}</th>`
         + firstDays.map(d=>dataCell(d,i)).join('') + padTd(maxCols - firstDays.length)
-        + `<td rowspan="2"><strong>${totalWorkDays}</strong></td></tr>`;
+        + `<td rowspan="2"><strong>${totalWorkDays}</strong></td><td rowspan="2"><strong>${monthlyLeaveCount}</strong></td></tr>`;
       const rowB = `<tr>` + secondDays.map(d=>dataCell(d,i)).join('') + padTd(maxCols - secondDays.length) + `</tr>`;
       body += rowA + rowB;
     }
 
     const footRow1cells = firstDays.map(d=>{ const w = workingCountFor(d); return `<td class="${w.low?'warn':''}">${w.working}</td>`; }).join('') + padTd(maxCols - firstDays.length);
     const footRow2cells = secondDays.map(d=>{ const w = workingCountFor(d); return `<td class="${w.low?'warn':''}">${w.working}</td>`; }).join('') + padTd(maxCols - secondDays.length);
-    const foot = `<tr><td colspan="2" class="foot-label">근무인원 (1~${firstEnd}일)</td>${footRow1cells}<td></td></tr>`
-      + `<tr><td colspan="2" class="foot-label">근무인원 (${firstEnd+1}~${dim}일)</td>${footRow2cells}<td></td></tr>`;
+    const foot = `<tr><td colspan="2" class="foot-label">근무인원 (1~${firstEnd}일)</td>${footRow1cells}<td></td><td></td></tr>`
+      + `<tr><td colspan="2" class="foot-label">근무인원 (${firstEnd+1}~${dim}일)</td>${footRow2cells}<td></td><td></td></tr>`;
 
     document.getElementById('boardBlocks').innerHTML = `
       <p class="board-block-title">${m}월 근무 현황 (1일~${dim}일)</p>
@@ -1473,16 +1477,17 @@
     const legal = state.monthData.legalHolidays.length;
     const temp = state.monthData.tempHolidays.length;
     const fixedTotal = thu+fri;
-    const comparePool = sat+sun+legalForCompare+tempForCompare;
-    const extraOff = Math.max(0, comparePool - fixedTotal);
-    return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,extraOff};
+    const comparePool = sat+sun+legalForCompare;
+    const baseExtraOff = Math.max(0, comparePool - fixedTotal);
+    const extraOff = baseExtraOff + temp;
+    return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,baseExtraOff,extraOff};
   }
 
   function renderTopStats(){
     const s = computeStats();
     document.getElementById('topStats').innerHTML = `
       <div class="tcard"><div class="l">목·금 정기휴무</div><div class="v">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
-      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}+대체${s.tempForCompare}=${s.comparePool}) − 목금${s.fixedTotal}<br>공휴일·대체는 토·일·목·금과 안 겹치는 날짜만 집계</div></div>
+      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금과 안 겹치는 날짜만 집계</div></div>
       <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
       <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
       <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
@@ -1621,7 +1626,7 @@
   }
 
   // ---------- BOARD TAB (per-employee mini calendar) ----------
-  function renderBoard(){
+  async function renderBoard(){
     const y=state.year, m=state.month, dim=daysInMonth(y,m);
     const main = document.getElementById('m-mainArea');
     const firstDow = new Date(y,m-1,1).getDay();
@@ -1633,6 +1638,7 @@
       const mine = (state.monthData.selections[c.key]||[]).find(e=>e.idx===state.selectedEmp);
       if(!mine){ totalWorkDays++; if(c.isLegal) holidayWork++; }
     }
+    const yearly = await personalYearlyCounts(state.selectedEmp);
 
     let calCells = DOW.map(d=>`<div class="dow">${d}</div>`).join('');
     for(let i=0;i<firstDow;i++) calCells += `<div class="mini-cell empty"></div>`;
@@ -1656,10 +1662,10 @@
       <div class="stat-strip">
         <div class="stat-mini"><div class="l">총근무일</div><div class="v">${totalWorkDays}일</div></div>
         <div class="stat-mini"><div class="l">공휴일근무</div><div class="v">${holidayWork}일</div></div>
-        <div class="stat-mini"><div class="l">월차/조퇴</div><div class="v">${personalMonthlyCounts(state.selectedEmp).wolcha}/${personalMonthlyCounts(state.selectedEmp).jotoe}</div></div>
+        <div class="stat-mini"><div class="l">월차/조퇴(연간)</div><div class="v">${yearly.wolcha}/${yearly.jotoe}</div></div>
       </div>
       <div class="mini-cal">${calCells}</div>
-      <p class="note">목·금·대체휴일은 회색, 개별 신청 휴무는 파란색으로 표시됩니다. 상단에서 직원을 바꿔가며 확인할 수 있어요.</p>
+      <p class="note">목·금·대체휴일은 회색, 개별 신청 휴무는 파란색으로 표시됩니다. 월차/조퇴는 1월부터 현재 달까지 누적된 값입니다. 상단에서 직원을 바꿔가며 확인할 수 있어요.</p>
     `;
     document.getElementById('m-empSelect').addEventListener('change', (e)=>{
       state.selectedEmp = parseInt(e.target.value,10);
