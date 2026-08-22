@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
-<title>B조 휴무신청 관리시트</title>
+<title>B조 휴무신청 도우미</title>
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#3D2B52">
 <meta name="mobile-web-app-capable" content="yes">
@@ -317,7 +317,7 @@
   <div class="topbar">
     <div>
       <p class="brand-eyebrow">TEAM SCHEDULE</p>
-      <h1>B조 휴무신청 관리시트</h1>
+      <h1>B조 휴무신청 도우미</h1>
     </div>
     <div class="month-nav">
       <button id="prevMonth" aria-label="이전 달">‹</button>
@@ -351,7 +351,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="signup">신청 시트 (A4 가로)</div>
     <div class="tab" data-tab="board">근무 현황판</div>
-    <div class="tab" data-tab="payroll">급여 명세표</div>
+    <div class="tab" data-tab="payroll">예상 급여</div>
   </div>
 
   <div class="legend-row">
@@ -393,7 +393,7 @@
         <div class="stat-card"><div class="label">주휴수당(주1회)</div><div class="value">50,000원</div></div>
         <div class="stat-card"><div class="label">법정공휴일 근무</div><div class="value">일당×200%</div></div>
       </div>
-      <p class="note">근무한 날은 일당+교통비(법정공휴일 근무는 일당×200%)가 지급됩니다. <strong>월차는 일당은 지급하되 교통비는 지급하지 않습니다.</strong> <strong>정기휴무(기본값)·휴무·병가·결근은 일당·교통비 모두 지급하지 않습니다(무급).</strong> <strong>대체</strong>는 정기휴무일(목·금)에 정상 근무한 경우 그날은 일당+교통비를 지급하고, 그 대가로 쉬는 근무일은 이미 다른 날 지급되었으므로 무급 처리합니다. <strong>병가가 발생한 주는 주휴수당 지급 대상에서 제외됩니다</strong> (근로기준법상 주휴수당은 소정근로일 개근을 요건으로 하는 점을 반영). 조퇴는 실제 출근한 것으로 보아 정상 근무(일당+교통비)로 처리했습니다. 4대보험 요율은 참고용 예시치이며, 실제 지급 전 최신 요율을 반드시 확인하시기 바랍니다. 이 표는 세무·노무 자문을 대체하지 않습니다.</p>
+      <p class="note">근무한 날은 일당+교통비(법정공휴일 근무는 일당×200%)가 지급됩니다. <strong>월차는 일당은 지급하되 교통비는 지급하지 않습니다.</strong> <strong>정기휴무(기본값)·휴무·병가·결근은 일당·교통비 모두 지급하지 않습니다(무급).</strong> <strong>대체</strong>는 정기휴무일(목·금)에 정상 근무한 경우 그날은 일당+교통비를 지급하고, 그 대가로 쉬는 근무일은 이미 다른 날 지급되었으므로 무급 처리합니다. <strong>병가가 발생한 주는 주휴수당 지급 대상에서 제외됩니다</strong> (근로기준법상 주휴수당은 소정근로일 개근을 요건으로 하는 점을 반영). 조퇴는 실제 출근한 것으로 보아 정상 근무(일당+교통비)로 처리했습니다. 4대보험 요율은 참고용 예시치입니다.</p>
     </div>
 
     <div class="staff-picker" style="margin-bottom:14px;">
@@ -418,7 +418,7 @@
 <div class="app">
   <div class="mtop">
     <div class="mtop-row">
-      <div class="mtitle">B조 휴무신청 관리시트</div>
+      <div class="mtitle">B조 휴무신청 도우미</div>
       <button class="msettings-btn" id="m-openSettings">⚙</button>
     </div>
     <div class="mmonth-nav">
@@ -435,7 +435,7 @@
   <nav class="bnav">
     <button data-tab="signup" class="active"><span class="ic">📝</span>신청</button>
     <button data-tab="board"><span class="ic">📅</span>근무현황</button>
-    <button data-tab="payroll"><span class="ic">💰</span>급여</button>
+    <button data-tab="payroll"><span class="ic">💰</span>예상 급여</button>
   </nav>
 </div>
 
@@ -523,7 +523,7 @@
   function dateKey(y,m,d){ return `${y}-${pad(m)}-${pad(d)}`; }
   function daysInMonth(y,m){ return new Date(y, m, 0).getDate(); }
 
-  // Official Korean public holidays (관공서 공휴일), sourced from KASI(우주항공청) 월력요항 announcements.
+  // Official Korean public holidays (관공서 공휴일), sourced from KASI(항공청) 월력요항 announcements.
   // Covers 2026-2027 with confirmed dates including 대체공휴일. Other years require manual entry.
   const KOREAN_HOLIDAYS = {
     2026: [
@@ -658,7 +658,7 @@
     const s = computeStats();
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="label">목·금 정기휴무</div><div class="value">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
-      <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금과 겹치지 않는 날짜만 집계</div></div>
+      <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금 제외</div></div>
       <div class="stat-card"><div class="label">법정공휴일</div><div class="value">${s.legal}일</div></div>
       <div class="stat-card"><div class="label">대체휴일</div><div class="value">${s.temp}일</div></div>
       <div class="stat-card"><div class="label">근무일수</div><div class="value">${s.workdays}일</div></div>
@@ -1767,7 +1767,7 @@
     });
     const note = document.createElement('p');
     note.className='note';
-    note.textContent = '월차는 일당은 지급하되 교통비는 지급하지 않습니다. 정기휴무·휴무·병가·결근은 일당·교통비 모두 지급하지 않습니다(무급). 대체는 정기휴무일 근무 시 정상 근무로 일당+교통비가 지급됩니다. 병가가 있는 주는 주휴수당 대상에서 제외됩니다. 4대보험 요율은 참고용 예시치입니다. 실제 지급 전 최신 요율을 확인하세요. 세무·노무 자문을 대체하지 않습니다.';
+    note.textContent = '월차는 일당은 지급하되 교통비는 지급하지 않습니다. 정기휴무·휴무·병가·결근은 일당·교통비 모두 지급하지 않습니다(무급). 대체는 정기휴무일 근무 시 정상 근무로 일당+교통비가 지급됩니다. 병가가 있는 주는 주휴수당 대상에서 제외됩니다. 4대보험 요율은 참고용 예시치입니다.';
     main.appendChild(note);
   }
 

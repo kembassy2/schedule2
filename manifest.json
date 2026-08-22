@@ -1,7 +1,7 @@
 {
-  "name": "B조 휴무신청 관리시트",
-  "short_name": "B조휴무관리",
-  "description": "B조 팀 휴무 신청, 근무 현황판, 급여명세표를 한 번에 관리하는 앱 (목·금 정기휴무)",
+  "name": "B조 휴무신청 도우미",
+  "short_name": "B조 휴무관리",
+  "description": "B조 팀 휴무 신청, 근무 현황판, 예상 급여를 한 번에 관리하는 앱 (목·금 정기휴무)",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
