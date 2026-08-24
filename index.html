@@ -225,11 +225,7 @@
   .working-line strong{color:var(--ink);}
   .working-line.low strong{color:var(--warn);}
 
-  /* Stats strip */
-  .stat-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
-  .stat-mini{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 8px;text-align:center;}
-  .stat-mini .l{font-size:14.5px;color:var(--ink-soft);font-weight:600;}
-  .stat-mini .v{font-size:22px;font-weight:800;margin-top:2px;}
+
 
   .top-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 14px 2px;}
   .top-stats .tcard{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:8px 10px;}
@@ -243,14 +239,20 @@
   /* Board: employee picker + mini calendar */
   .emp-select-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
   .emp-select-row select{flex:1;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:20.5px;background:var(--surface);font-weight:700;}
-  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:10px;}
-  .mini-cal .dow{text-align:center;font-size:14.5px;font-weight:700;color:var(--ink-soft);padding-bottom:3px;}
-  .mini-cell{aspect-ratio:1/1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13.5px;font-weight:700;background:var(--bg);border:1px solid var(--line);gap:1px;}
+  .mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:8px;}
+  .mini-cal .dow{text-align:center;font-size:13px;font-weight:700;color:var(--ink-soft);padding-bottom:2px;}
+  .mini-cell{aspect-ratio:1/1;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:var(--bg);border:1px solid var(--line);gap:1px;overflow:hidden;}
   .mini-cell.empty{visibility:hidden;}
-  .mini-cell .dnum{font-size:16px;font-weight:800;}
+  .mini-cell .dnum{font-size:14px;font-weight:800;line-height:1.1;}
   .mini-cell.off-fixed{background:var(--fixed-soft);color:var(--fixed);}
   .mini-cell.off-extra{background:var(--accent-soft);color:var(--accent-strong);}
   .mini-cell.weekend .dnum{color:var(--warn);}
+  /* stat-strip: 2열로 정렬해 폰 너비 활용 */
+  .stat-strip{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+  .stat-strip .stat-mini:last-child{grid-column:1 / -1;}
+  .stat-mini{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:9px 8px;text-align:center;}
+  .stat-mini .l{font-size:14.5px;color:var(--ink-soft);font-weight:600;}
+  .stat-mini .v{font-size:22px;font-weight:800;margin-top:2px;}
 
   /* Payroll cards */
   .pay-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:10px;overflow:hidden;}
@@ -377,7 +379,6 @@
 
   <div id="tab-board" style="display:none;">
     <div class="toolbar">
-      <button class="btn ghost" id="exportCsvBtn">CSV로 내보내기</button>
       <button class="btn ghost" id="printBtn">인쇄</button>
     </div>
     <div id="boardBlocks"></div>
@@ -401,9 +402,6 @@
       <div class="staff-pill" data-mode="partial">국민연금·건강보험 미포함 명세</div>
     </div>
 
-    <div class="toolbar">
-      <button class="btn ghost" id="exportPayrollCsvBtn">CSV로 내보내기</button>
-    </div>
     <div class="board-wrap">
       <table class="board" id="payrollTable"></table>
     </div>
@@ -1248,9 +1246,7 @@
       document.getElementById('tab-payroll').style.display = which==='payroll' ? '' : 'none';
     });
   });
-  document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
   document.getElementById('printBtn').addEventListener('click', ()=>window.print());
-  document.getElementById('exportPayrollCsvBtn').addEventListener('click', exportPayrollCsv);
   document.querySelectorAll('#tab-payroll .staff-pill').forEach(pill=>{
     pill.addEventListener('click', ()=>{
       document.querySelectorAll('#tab-payroll .staff-pill').forEach(p=>p.classList.remove('active'));
