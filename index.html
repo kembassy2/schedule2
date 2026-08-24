@@ -637,7 +637,7 @@
     const temp = state.monthData.tempHolidays.length;
     const fixedTotal = thu+fri;
     const comparePool = sat+sun+legalForCompare;
-    const baseExtraOff = Math.max(0, comparePool - fixedTotal);
+    const baseExtraOff = comparePool - fixedTotal;
     const extraOff = baseExtraOff + temp;
     return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,baseExtraOff,extraOff};
   }
@@ -1474,7 +1474,7 @@
     const temp = state.monthData.tempHolidays.length;
     const fixedTotal = thu+fri;
     const comparePool = sat+sun+legalForCompare;
-    const baseExtraOff = Math.max(0, comparePool - fixedTotal);
+    const baseExtraOff = comparePool - fixedTotal;
     const extraOff = baseExtraOff + temp;
     return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,baseExtraOff,extraOff};
   }
