@@ -1483,7 +1483,7 @@
     const s = computeStats();
     document.getElementById('topStats').innerHTML = `
       <div class="tcard"><div class="l">목·금 정기휴무</div><div class="v">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
-      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금과 안 겹치는 날짜만 집계</div></div>
+      <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금 제외</div></div>
       <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
       <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
       <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
