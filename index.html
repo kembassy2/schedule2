@@ -474,7 +474,6 @@
 </div>
 
 <div class="toast" id="m-toast"></div>
-</div>
 
 <div class="layout-switch-note" id="layoutNote" style="display:none;"></div>
 
@@ -1531,45 +1530,51 @@
 
   const monthDataCache = {};
   async function getMonthDataForYear(y, mm){
-    if(y === state.year && mm === state.month) return state.monthData;
+    if(y === state.year && mm === state.month) return state.monthData || { legalHolidays: [], tempHolidays: [], selections: {}, fixedOverrides: {} };
     const cacheKey = `${y}-${pad(mm)}`;
     if(monthDataCache[cacheKey]) return monthDataCache[cacheKey];
-    const v = await storageGet(monthKey(y, mm), true);
-    let data = { legalHolidays: [], tempHolidays: [], selections: {}, fixedOverrides: {} };
-    if(v){
-      try{
-        const parsed = JSON.parse(v);
+    let data = { legalHolidays: autoFillLegalHolidays(y, mm), tempHolidays: [], selections: {}, fixedOverrides: {} };
+    try {
+      const v = await storageGet(monthKey(y, mm), true);
+      if(v){
+        const parsed = typeof v === 'object' ? v : JSON.parse(v);
         let selections = parsed.selections || {};
         Object.keys(selections).forEach(k=>{
           selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
         });
-        data = { legalHolidays: parsed.legalHolidays||[], tempHolidays: parsed.tempHolidays||[], selections, fixedOverrides: parsed.fixedOverrides||{} };
-      }catch(e){}
-    }
+        data = { legalHolidays: parsed.legalHolidays||parsed.holidays||autoFillLegalHolidays(y, mm), tempHolidays: parsed.tempHolidays||[], selections, fixedOverrides: parsed.fixedOverrides||{} };
+      }
+    }catch(e){}
     monthDataCache[cacheKey] = data;
     return data;
   }
   async function personalYearlyCounts(idx){
     const y = state.year;
     let wolcha=0, jotoe=0;
-    for(let mm=1; mm<=state.month; mm++){
-      const data = await getMonthDataForYear(y, mm);
-      const dim = daysInMonth(y, mm);
-      for(let d=1; d<=dim; d++){
-        const dow = new Date(y, mm-1, d).getDay();
-        const isFixedWeekly = dow===4 || dow===5;
-        const key = dateKey(y, mm, d);
-        const isTemp = data.tempHolidays.includes(key);
-        if(isFixedWeekly){
-          const ov = data.fixedOverrides[key] || {};
-          if(ov[idx]==='월차') wolcha++;
-          if(ov[idx]==='조퇴') jotoe++;
-        } else if(!isTemp){
-          const mine = (data.selections[key]||[]).find(e=>e.idx===idx);
-          if(mine){ if(mine.type==='월차') wolcha++; if(mine.type==='조퇴') jotoe++; }
+    try {
+      for(let mm=1; mm<=state.month; mm++){
+        const data = await getMonthDataForYear(y, mm);
+        const dim = daysInMonth(y, mm);
+        const tempH = (data && data.tempHolidays) ? data.tempHolidays : [];
+        const fixedO = (data && data.fixedOverrides) ? data.fixedOverrides : {};
+        const selMap = (data && data.selections) ? data.selections : {};
+
+        for(let d=1; d<=dim; d++){
+          const dow = new Date(y, mm-1, d).getDay();
+          const isFixedWeekly = dow===4 || dow===5;
+          const key = dateKey(y, mm, d);
+          const isTemp = tempH.includes(key);
+          if(isFixedWeekly){
+            const ov = fixedO[key] || {};
+            if(ov[idx]==='월차') wolcha++;
+            if(ov[idx]==='조퇴') jotoe++;
+          } else if(!isTemp){
+            const mine = (selMap[key]||[]).find(e=>e.idx===idx);
+            if(mine){ if(mine.type==='월차') wolcha++; if(mine.type==='조퇴') jotoe++; }
+          }
         }
       }
-    }
+    } catch(e) { console.warn("personalYearlyCounts Error:", e); }
     return {wolcha,jotoe};
   }
 
