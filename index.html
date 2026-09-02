@@ -14,6 +14,9 @@
 <link rel="icon" href="./icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Firebase Compat SDK for Realtime Sync -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 
   :root{
@@ -456,6 +459,16 @@
         <h4>직원 명단 · 월차/조퇴 누적</h4>
         <div id="m-rosterList"></div>
       </div>
+      <div class="modal-section" style="border-top:1px dashed var(--line);padding-top:14px;margin-top:14px;">
+        <h4 style="color:var(--sat);"><i style="background:var(--sat)"></i>☁ Firebase 실시간 팀 공유</h4>
+        <p class="note" style="margin:0 0 8px;">Firebase Database URL을 입력하면 여러 팀원이 실시간으로 동일한 휴무 데이터를 공유합니다.</p>
+        <div class="holiday-add" style="flex-direction:column;gap:6px;">
+          <input type="text" id="m-fbUrl" placeholder="Database URL (예: https://...firebaseio.com)" style="width:100%;">
+          <input type="text" id="m-fbApiKey" placeholder="API Key (선택사항)" style="width:100%;">
+          <button id="m-saveFbBtn" style="background:var(--sat);width:100%;">설정 저장 및 연결</button>
+        </div>
+        <div id="m-fbStatus" class="note" style="margin-top:6px;font-weight:700;">연동 상태: 로컬 저장소 사용 중</div>
+      </div>
     </div>
   </div>
 </div>
@@ -488,8 +501,70 @@
     showToast._t = setTimeout(()=>toast.classList.remove('show'), 2200);
   }
 
+  const TEAM_KEY = 'team-B';
   const memoryFallback = {};
   const LS_PREFIX = 'team-schedule-B::';
+  let firebaseDb = null;
+  let isFirebaseSyncing = false;
+
+  function safeDbKey(key) {
+    return key.replace(/[\.#$\/\[\]]/g, '_');
+  }
+
+  function getFbConfig() {
+    try {
+      const v = localStorage.getItem('fb-config-json');
+      if (v) return JSON.parse(v);
+    } catch(e){}
+    return null;
+  }
+
+  function updateFbStatusText(msg, isSuccess) {
+    const el = document.getElementById('m-fbStatus');
+    if (el) {
+      el.textContent = "연동 상태: " + msg;
+      el.style.color = isSuccess ? "var(--sat)" : "var(--ink-soft)";
+    }
+  }
+
+  function initFirebaseSync(renderCb) {
+    const cfg = getFbConfig();
+    if (!cfg || !cfg.databaseURL) {
+      updateFbStatusText("로컬 저장소 전용 (연동 설정 필요)", false);
+      return;
+    }
+    try {
+      if (window.firebase) {
+        if (!firebase.apps.length) {
+          firebase.initializeApp({
+            apiKey: cfg.apiKey || "dummy-key",
+            databaseURL: cfg.databaseURL
+          });
+        }
+        firebaseDb = firebase.database();
+        updateFbStatusText("☁ Firebase 실시간 동기화 완료!", true);
+
+        firebaseDb.ref(TEAM_KEY).on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            isFirebaseSyncing = true;
+            Object.keys(val).forEach(dbKey => {
+              const originalKey = dbKey.replace(/_/g, ':').replace('month:data', 'month-data');
+              const stringVal = typeof val[dbKey] === 'object' ? JSON.stringify(val[dbKey]) : String(val[dbKey]);
+              memoryFallback[originalKey] = stringVal;
+              lsSet(originalKey, stringVal);
+            });
+            isFirebaseSyncing = false;
+            if (renderCb) renderCb();
+          }
+        });
+      }
+    } catch(e) {
+      console.warn("Firebase Init Error", e);
+      updateFbStatusText("연동 실패: " + e.message, false);
+    }
+  }
+
   function lsGet(key){
     try{ const v = localStorage.getItem(LS_PREFIX+key); return v===null ? undefined : v; }catch(e){ return undefined; }
   }
@@ -505,7 +580,16 @@
   async function storageSet(key, value, shared){
     memoryFallback[key] = value;
     lsSet(key, value);
-    try{ if(window.storage){ await window.storage.set(key, value, shared); } }catch(e){ console.warn('window.storage unavailable, saved to localStorage instead', e); }
+    try{ if(window.storage){ await window.storage.set(key, value, shared); } }catch(e){}
+
+    if (firebaseDb && !isFirebaseSyncing) {
+      try {
+        const dbKey = safeDbKey(key);
+        let parsedVal = value;
+        try { parsedVal = JSON.parse(value); } catch(e){}
+        firebaseDb.ref(TEAM_KEY + '/' + dbKey).set(parsedVal);
+      } catch(e) { console.warn("Firebase Save Error", e); }
+    }
   }
 
   const today = new Date();
@@ -1088,7 +1172,7 @@
 
   function computePayroll(idx){
     const y=state.year, m=state.month, dim = daysInMonth(y,m);
-    let actualWorkDays = 0, holidayWorkDays = 0, substituteWorkedDays = 0, monthlyLeaveDays = 0, unpaidDays = 0;
+    let actualWorkDays = 0, holidayWorkDays = 0, substituteWorkedDays = 0, substituteHolidayWorkedDays = 0, monthlyLeaveDays = 0, unpaidDays = 0;
     const weeksWithWork = new Set();
     const weeksWithSickLeave = new Set();
     for(let d=1; d<=dim; d++){
@@ -1098,8 +1182,9 @@
         const ov = state.monthData.fixedOverrides[c.key] || {};
         const type = ov[idx] || '정기휴무';
         if(type === '대체'){
-          // 정기휴무일에 정상 근무 → 일당+교통비 지급 (근무일 취급)
+          // 정기휴무일에 정상 근무 → 일당+교통비 지급 (대체근무)
           substituteWorkedDays++;
+          if(c.isLegal) substituteHolidayWorkedDays++; // 법정공휴일에 대체근무한 경우 일당×200% 적용
           weeksWithWork.add(weekKey);
         } else if(type === '조퇴'){
           actualWorkDays++;
@@ -1139,7 +1224,8 @@
     const regularDays = actualWorkDays - holidayWorkDays;
     const regularWage = regularDays * PAY.dailyWage;
     const holidayWage = holidayWorkDays * PAY.dailyWage * PAY.holidayMultiplier;
-    const substituteWage = substituteWorkedDays * PAY.dailyWage;
+    const regSubstituteDays = substituteWorkedDays - substituteHolidayWorkedDays;
+    const substituteWage = (regSubstituteDays * PAY.dailyWage) + (substituteHolidayWorkedDays * PAY.dailyWage * PAY.holidayMultiplier);
     const monthlyLeaveWage = monthlyLeaveDays * PAY.dailyWage;
     const transport = (actualWorkDays + substituteWorkedDays) * PAY.transport;
     let eligibleWeeks = 0;
@@ -1157,7 +1243,7 @@
     const partialDeduction = employment;
     const netPartial = gross - partialDeduction;
 
-    return {actualWorkDays, holidayWorkDays, substituteWorkedDays, monthlyLeaveDays, unpaidDays, regularDays, regularWage, holidayWage, substituteWage, monthlyLeaveWage, transport, weeklyAllowance, gross,
+    return {actualWorkDays, holidayWorkDays, substituteWorkedDays, substituteHolidayWorkedDays, monthlyLeaveDays, unpaidDays, regularDays, regularWage, holidayWage, substituteWage, monthlyLeaveWage, transport, weeklyAllowance, gross,
       pension, health, longTerm, employment, fullDeduction, netFull, partialDeduction, netPartial};
   }
 
@@ -1259,6 +1345,10 @@
   window.__initDesktop = async function(){
     await loadStaffNames();
     await loadMonthData();
+    initFirebaseSync(async ()=>{
+      await loadMonthData();
+      render();
+    });
     render();
   };
 })();
@@ -1684,7 +1774,7 @@
   }
   function computePayroll(idx){
     const y=state.year, m=state.month, dim=daysInMonth(y,m);
-    let actualWorkDays=0, holidayWorkDays=0, substituteWorkedDays=0, monthlyLeaveDays=0, unpaidDays=0;
+    let actualWorkDays=0, holidayWorkDays=0, substituteWorkedDays=0, substituteHolidayWorkedDays=0, monthlyLeaveDays=0, unpaidDays=0;
     const weeksWithWork = new Set();
     const weeksWithSickLeave = new Set();
     for(let d=1; d<=dim; d++){
@@ -1693,7 +1783,11 @@
       if(c.isFixedWeekly){
         const ov = state.monthData.fixedOverrides[c.key] || {};
         const type = ov[idx] || '정기휴무';
-        if(type === '대체'){ substituteWorkedDays++; weeksWithWork.add(weekKey); }
+        if(type === '대체'){
+          substituteWorkedDays++;
+          if(c.isLegal) substituteHolidayWorkedDays++;
+          weeksWithWork.add(weekKey);
+        }
         else if(type === '조퇴'){ actualWorkDays++; if(c.isLegal) holidayWorkDays++; weeksWithWork.add(weekKey); }
         else if(type === '월차'){ monthlyLeaveDays++; }
         else { unpaidDays++; if(type==='병가') weeksWithSickLeave.add(weekKey); } // 정기휴무 기본값·휴무·병가·결근
@@ -1711,7 +1805,8 @@
     const regularDays = actualWorkDays - holidayWorkDays;
     const regularWage = regularDays * PAY.dailyWage;
     const holidayWage = holidayWorkDays * PAY.dailyWage * PAY.holidayMultiplier;
-    const substituteWage = substituteWorkedDays * PAY.dailyWage;
+    const regSubstituteDays = substituteWorkedDays - substituteHolidayWorkedDays;
+    const substituteWage = (regSubstituteDays * PAY.dailyWage) + (substituteHolidayWorkedDays * PAY.dailyWage * PAY.holidayMultiplier);
     const monthlyLeaveWage = monthlyLeaveDays * PAY.dailyWage;
     const transport = (actualWorkDays + substituteWorkedDays) * PAY.transport;
     let eligibleWeeks = 0;
@@ -1720,7 +1815,7 @@
     const gross = regularWage + holidayWage + substituteWage + monthlyLeaveWage + transport + weeklyAllowance;
     const pension = gross*PAY.nationalPension, health=gross*PAY.healthInsurance, longTerm=health*PAY.longTermCareOfHealth, employment=gross*PAY.employmentInsurance;
     const fullDeduction = pension+health+longTerm+employment;
-    return {actualWorkDays,holidayWorkDays,substituteWorkedDays,monthlyLeaveDays,unpaidDays,regularWage,holidayWage,substituteWage,monthlyLeaveWage,transport,weeklyAllowance,gross,
+    return {actualWorkDays,holidayWorkDays,substituteWorkedDays,substituteHolidayWorkedDays,monthlyLeaveDays,unpaidDays,regularWage,holidayWage,substituteWage,monthlyLeaveWage,transport,weeklyAllowance,gross,
       pension,health,longTerm,employment,fullDeduction,netFull:gross-fullDeduction,netPartial:gross-employment};
   }
   function renderPayroll(){
@@ -1836,7 +1931,29 @@
     });
   });
   document.getElementById('m-openSettings').addEventListener('click', ()=>{
+    const cfg = getFbConfig();
+    if(cfg){
+      if(document.getElementById('m-fbUrl')) document.getElementById('m-fbUrl').value = cfg.databaseURL || '';
+      if(document.getElementById('m-fbApiKey')) document.getElementById('m-fbApiKey').value = cfg.apiKey || '';
+    }
     document.getElementById('m-settingsOverlay').style.display='flex';
+  });
+  document.getElementById('m-saveFbBtn').addEventListener('click', async ()=>{
+    const url = document.getElementById('m-fbUrl').value.trim();
+    const apiKey = document.getElementById('m-fbApiKey').value.trim();
+    if(!url){
+      showToast('Firebase Database URL을 입력해주세요.');
+      return;
+    }
+    const config = { databaseURL: url, apiKey: apiKey };
+    localStorage.setItem('fb-config-json', JSON.stringify(config));
+    showToast('Firebase 설정이 저장되었습니다.');
+    initFirebaseSync(async ()=>{
+      await loadMonthData();
+      render();
+    });
+    await loadMonthData();
+    render();
   });
   document.getElementById('m-closeSettings').addEventListener('click', ()=>{
     document.getElementById('m-settingsOverlay').style.display='none';
@@ -1848,6 +1965,10 @@
   window.__initMobile = async function(){
     await loadStaffNames();
     await loadMonthData();
+    initFirebaseSync(async ()=>{
+      await loadMonthData();
+      render();
+    });
     render();
   };
 })();
