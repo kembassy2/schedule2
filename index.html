@@ -328,6 +328,7 @@
       <button id="prevMonth" aria-label="이전 달">‹</button>
       <div class="month-label" id="monthLabel">2026년 7월</div>
       <button id="nextMonth" aria-label="다음 달">›</button>
+      <button class="btn ghost" id="openSettingsBtn" style="margin-left:12px;padding:5px 12px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">⚙ 설정</button>
     </div>
   </div>
 
@@ -508,7 +509,21 @@
   let isFirebaseSyncing = false;
 
   function safeDbKey(key) {
-    return key.replace(/[\.#$\/\[\]]/g, '_');
+    return key.replace(/\./g, '__dot__')
+              .replace(/#/g, '__hash__')
+              .replace(/\$/g, '__dollar__')
+              .replace(/\[/g, '__lbr__')
+              .replace(/\]/g, '__rbr__')
+              .replace(/\//g, '__slash__');
+  }
+
+  function restoreDbKey(dbKey) {
+    return dbKey.replace(/__dot__/g, '.')
+                .replace(/__hash__/g, '#')
+                .replace(/__dollar__/g, '$')
+                .replace(/__lbr__/g, '[')
+                .replace(/__rbr__/g, ']')
+                .replace(/__slash__/g, '/');
   }
 
   function getFbConfig() {
@@ -549,7 +564,7 @@
           if (val) {
             isFirebaseSyncing = true;
             Object.keys(val).forEach(dbKey => {
-              const originalKey = dbKey.replace(/_/g, ':').replace('month:data', 'month-data');
+              const originalKey = restoreDbKey(dbKey);
               const stringVal = typeof val[dbKey] === 'object' ? JSON.stringify(val[dbKey]) : String(val[dbKey]);
               memoryFallback[originalKey] = stringVal;
               lsSet(originalKey, stringVal);
@@ -651,23 +666,26 @@
   }
   async function saveStaffNames(){ await storageSet('b-staff-names', JSON.stringify(state.staffNames), true); }
   async function loadMonthData(){
-    const v = await storageGet(monthKey(state.year, state.month), true);
-    if(v){
-      try{
-        const parsed = JSON.parse(v);
-        let selections = parsed.selections || {};
-        Object.keys(selections).forEach(k=>{
-          selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
-        });
-        state.monthData = {
-          legalHolidays: parsed.legalHolidays || parsed.holidays || [],
-          tempHolidays: parsed.tempHolidays || [],
-          selections,
-          fixedOverrides: parsed.fixedOverrides || {}
-        };
-      }catch(e){ state.monthData = { legalHolidays: autoFillLegalHolidays(state.year, state.month), tempHolidays: [], selections: {}, fixedOverrides: {} }; }
-    } else {
-      // First time this month is opened: auto-fill legal holidays from the official table, just like weekends are auto-detected.
+    try {
+      const v = await storageGet(monthKey(state.year, state.month), true);
+      if(v){
+        try{
+          const parsed = typeof v === 'object' ? v : JSON.parse(v);
+          let selections = parsed.selections || {};
+          Object.keys(selections).forEach(k=>{
+            selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
+          });
+          state.monthData = {
+            legalHolidays: parsed.legalHolidays || parsed.holidays || autoFillLegalHolidays(state.year, state.month),
+            tempHolidays: parsed.tempHolidays || [],
+            selections,
+            fixedOverrides: parsed.fixedOverrides || {}
+          };
+        }catch(e){ state.monthData = { legalHolidays: autoFillLegalHolidays(state.year, state.month), tempHolidays: [], selections: {}, fixedOverrides: {} }; }
+      } else {
+        state.monthData = { legalHolidays: autoFillLegalHolidays(state.year, state.month), tempHolidays: [], selections: {}, fixedOverrides: {} };
+      }
+    } catch(e) {
       state.monthData = { legalHolidays: autoFillLegalHolidays(state.year, state.month), tempHolidays: [], selections: {}, fixedOverrides: {} };
     }
   }
@@ -1332,7 +1350,18 @@
       document.getElementById('tab-payroll').style.display = which==='payroll' ? '' : 'none';
     });
   });
-  document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+  const openSettingsBtn = document.getElementById('openSettingsBtn');
+  if(openSettingsBtn){
+    openSettingsBtn.addEventListener('click', ()=>{
+      const cfg = getFbConfig();
+      if(cfg){
+        if(document.getElementById('m-fbUrl')) document.getElementById('m-fbUrl').value = cfg.databaseURL || '';
+        if(document.getElementById('m-fbApiKey')) document.getElementById('m-fbApiKey').value = cfg.apiKey || '';
+      }
+      const overlay = document.getElementById('m-settingsOverlay');
+      if(overlay) overlay.style.display = 'flex';
+    });
+  }
   document.querySelectorAll('#tab-payroll .staff-pill').forEach(pill=>{
     pill.addEventListener('click', ()=>{
       document.querySelectorAll('#tab-payroll .staff-pill').forEach(p=>p.classList.remove('active'));
