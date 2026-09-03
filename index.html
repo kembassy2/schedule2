@@ -312,6 +312,27 @@
     opacity:.85;
   }
 
+  /* ===== Settings modal — GLOBAL (works in both PC & mobile) ===== */
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,24,30,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;}
+  .modal-sheet{background:#fff;width:100%;max-width:520px;margin:auto;border-radius:18px;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 10px 30px rgba(0,0,0,.25);}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #E4E7EC;font-weight:800;font-size:22px;}
+  .modal-header button{background:#EEF0F3;border:none;width:30px;height:30px;border-radius:8px;font-size:20.5px;color:#5B6472;cursor:pointer;}
+  .modal-body{overflow-y:auto;padding:14px 16px 24px;}
+  .modal-section{margin-bottom:18px;}
+  .modal-section h4{font-size:18px;font-weight:800;color:var(--accent-strong,#3D2B52);margin:0 0 8px;display:flex;align-items:center;gap:6px;}
+  .modal-section h4 i{width:9px;height:9px;border-radius:3px;display:inline-block;}
+  .holiday-add{display:flex;gap:6px;margin-bottom:8px;}
+  .holiday-add input{flex:1;padding:8px;border:1px solid #E4E7EC;border-radius:8px;font-size:16px;font-family:inherit;}
+  .holiday-add button{background:var(--accent,#6C4A8C);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-size:16px;font-weight:700;cursor:pointer;}
+  .chip-wrap{display:flex;flex-wrap:wrap;gap:6px;min-height:24px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:13px;font-weight:600;}
+  .chip button{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;color:inherit;}
+  .roster-item{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px dashed #E4E7EC;}
+  .roster-item .rnum{width:18px;font-size:16px;color:#5B6472;text-align:right;}
+  .roster-item input{flex:1;min-width:0;padding:7px 8px;border:1px solid #E4E7EC;border-radius:7px;font-size:16px;font-family:inherit;}
+  .roster-item .rcount{font-size:14px;color:#5B6472;white-space:nowrap;}
+  .roster-item .rcount strong{color:var(--accent-strong,#3D2B52);}
+
 </style>
 </head>
 <body>
@@ -1348,18 +1369,6 @@
       document.getElementById('tab-payroll').style.display = which==='payroll' ? '' : 'none';
     });
   });
-  const openSettingsBtn = document.getElementById('openSettingsBtn');
-  if(openSettingsBtn){
-    openSettingsBtn.addEventListener('click', ()=>{
-      const cfg = getFbConfig();
-      if(cfg){
-        if(document.getElementById('m-fbUrl')) document.getElementById('m-fbUrl').value = cfg.databaseURL || '';
-        if(document.getElementById('m-fbApiKey')) document.getElementById('m-fbApiKey').value = cfg.apiKey || '';
-      }
-      const overlay = document.getElementById('m-settingsOverlay');
-      if(overlay) overlay.style.display = 'flex';
-    });
-  }
   document.querySelectorAll('#tab-payroll .staff-pill').forEach(pill=>{
     pill.addEventListener('click', ()=>{
       document.querySelectorAll('#tab-payroll .staff-pill').forEach(p=>p.classList.remove('active'));
@@ -1460,25 +1469,34 @@
 
   async function loadStaffNames(){
     const v = await storageGet('b-staff-names', true);
-    if(v){ try{ const arr = JSON.parse(v); if(Array.isArray(arr) && arr.length === STAFF_COUNT) state.staffNames = arr; }catch(e){} }
+    if(v){
+      try{
+        const arr = typeof v === 'object' ? v : JSON.parse(v);
+        if(Array.isArray(arr) && arr.length === STAFF_COUNT) state.staffNames = arr;
+      }catch(e){}
+    }
   }
   async function saveStaffNames(){ await storageSet('b-staff-names', JSON.stringify(state.staffNames), true); }
   async function loadMonthData(){
-    const v = await storageGet(monthKey(state.year, state.month), true);
-    if(v){
-      try{
-        const parsed = JSON.parse(v);
-        let selections = parsed.selections || {};
-        Object.keys(selections).forEach(k=>{
-          selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
-        });
-        state.monthData = {
-          legalHolidays: parsed.legalHolidays || parsed.holidays || [],
-          tempHolidays: parsed.tempHolidays || [],
-          selections, fixedOverrides: parsed.fixedOverrides || {}
-        };
-      }catch(e){ state.monthData = { legalHolidays: autoFillLegalHolidays(state.year,state.month), tempHolidays: [], selections: {}, fixedOverrides: {} }; }
-    } else {
+    try {
+      const v = await storageGet(monthKey(state.year, state.month), true);
+      if(v){
+        try{
+          const parsed = (v !== null && typeof v === 'object') ? v : JSON.parse(v);
+          let selections = parsed.selections || {};
+          Object.keys(selections).forEach(k=>{
+            selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
+          });
+          state.monthData = {
+            legalHolidays: parsed.legalHolidays || parsed.holidays || autoFillLegalHolidays(state.year,state.month),
+            tempHolidays: parsed.tempHolidays || [],
+            selections, fixedOverrides: parsed.fixedOverrides || {}
+          };
+        }catch(e){ state.monthData = { legalHolidays: autoFillLegalHolidays(state.year,state.month), tempHolidays: [], selections: {}, fixedOverrides: {} }; }
+      } else {
+        state.monthData = { legalHolidays: autoFillLegalHolidays(state.year,state.month), tempHolidays: [], selections: {}, fixedOverrides: {} };
+      }
+    } catch(e) {
       state.monthData = { legalHolidays: autoFillLegalHolidays(state.year,state.month), tempHolidays: [], selections: {}, fixedOverrides: {} };
     }
   }
@@ -1486,6 +1504,7 @@
     await storageSet(monthKey(state.year, state.month), JSON.stringify(state.monthData), true);
     delete monthDataCache[`${state.year}-${pad(state.month)}`];
   }
+
 
   function classify(y,m,d){
     const dow = new Date(y, m-1, d).getDay();
@@ -1964,35 +1983,7 @@
     });
   });
   document.getElementById('m-openSettings').addEventListener('click', ()=>{
-    const cfg = getFbConfig();
-    if(cfg){
-      if(document.getElementById('m-fbUrl')) document.getElementById('m-fbUrl').value = cfg.databaseURL || '';
-      if(document.getElementById('m-fbApiKey')) document.getElementById('m-fbApiKey').value = cfg.apiKey || '';
-    }
-    document.getElementById('m-settingsOverlay').style.display='flex';
-  });
-  document.getElementById('m-saveFbBtn').addEventListener('click', async ()=>{
-    const url = document.getElementById('m-fbUrl').value.trim();
-    const apiKey = document.getElementById('m-fbApiKey').value.trim();
-    if(!url){
-      showToast('Firebase Database URL을 입력해주세요.');
-      return;
-    }
-    const config = { databaseURL: url, apiKey: apiKey };
-    localStorage.setItem('fb-config-json', JSON.stringify(config));
-    showToast('Firebase 설정이 저장되었습니다.');
-    initFirebaseSync(async ()=>{
-      await loadMonthData();
-      render();
-    });
-    await loadMonthData();
-    render();
-  });
-  document.getElementById('m-closeSettings').addEventListener('click', ()=>{
-    document.getElementById('m-settingsOverlay').style.display='none';
-  });
-  document.getElementById('m-settingsOverlay').addEventListener('click', (e)=>{
-    if(e.target.id==='m-settingsOverlay') e.currentTarget.style.display='none';
+    window.__openSettingsModal && window.__openSettingsModal();
   });
 
   window.__initMobile = async function(){
@@ -2006,55 +1997,77 @@
   };
 })();
 
+
 </script>
 
 <script>
   (function(){
-    function setupGlobalModalEvents(){
-      const closeBtn = document.getElementById('m-closeSettings');
-      const overlay = document.getElementById('m-settingsOverlay');
-      const saveBtn = document.getElementById('m-saveFbBtn');
+    /* ── 설정 모달 전역 제어 ── */
+    function getFbConfigSaved(){
+      try{ var v = localStorage.getItem('fb-config-json'); return v ? JSON.parse(v) : null; }catch(e){ return null; }
+    }
 
+    window.__openSettingsModal = function(){
+      var overlay = document.getElementById('m-settingsOverlay');
+      if(!overlay) return;
+      var cfg = getFbConfigSaved();
+      if(cfg){
+        var urlEl = document.getElementById('m-fbUrl');
+        var apiEl = document.getElementById('m-fbApiKey');
+        if(urlEl) urlEl.value = cfg.databaseURL || '';
+        if(apiEl) apiEl.value = cfg.apiKey || '';
+      }
+      overlay.style.display = 'flex';
+    };
+
+    function setupGlobalModalEvents(){
+      var overlay  = document.getElementById('m-settingsOverlay');
+      var closeBtn = document.getElementById('m-closeSettings');
+      var saveBtn  = document.getElementById('m-saveFbBtn');
+      var pcBtn    = document.getElementById('openSettingsBtn');
+
+      if(pcBtn){
+        pcBtn.addEventListener('click', function(){ window.__openSettingsModal(); });
+      }
       if(closeBtn){
-        closeBtn.onclick = function(){
+        closeBtn.addEventListener('click', function(){
           if(overlay) overlay.style.display = 'none';
-        };
+        });
       }
       if(overlay){
-        overlay.onclick = function(e){
+        overlay.addEventListener('click', function(e){
           if(e.target === overlay) overlay.style.display = 'none';
-        };
+        });
       }
       if(saveBtn){
-        saveBtn.onclick = async function(){
-          const urlEl = document.getElementById('m-fbUrl');
-          const apiEl = document.getElementById('m-fbApiKey');
-          const url = urlEl ? urlEl.value.trim() : '';
-          const apiKey = apiEl ? apiEl.value.trim() : '';
-          if(!url){
-            alert('Firebase Database URL을 입력해주세요.');
-            return;
-          }
-          const config = { databaseURL: url, apiKey: apiKey };
+        saveBtn.addEventListener('click', function(){
+          var urlEl  = document.getElementById('m-fbUrl');
+          var apiEl  = document.getElementById('m-fbApiKey');
+          var url    = urlEl  ? urlEl.value.trim()  : '';
+          var apiKey = apiEl  ? apiEl.value.trim()  : '';
+          if(!url){ alert('Firebase Database URL을 입력해주세요.'); return; }
+          var config = { databaseURL: url, apiKey: apiKey };
           localStorage.setItem('fb-config-json', JSON.stringify(config));
-          alert('Firebase 설정이 저장되었습니다.');
+          alert('Firebase 설정이 저장되었습니다. 앱을 다시 시작합니다.');
           location.reload();
-        };
+        });
       }
     }
-    if (document.readyState === 'loading') {
+
+    if(document.readyState === 'loading'){
       document.addEventListener('DOMContentLoaded', setupGlobalModalEvents);
     } else {
       setupGlobalModalEvents();
     }
 
-    const BREAKPOINT = 860;
-    let desktopInited = false, mobileInited = false;
-    let currentLayout = null;
+    /* ── 레이아웃 분기 ── */
+    var BREAKPOINT = 860;
+    var desktopInited = false, mobileInited = false;
+    var currentLayout = null;
 
     function applyLayout(){
-      const isDesktop = window.innerWidth >= BREAKPOINT;
-      const layout = isDesktop ? 'desktop' : 'mobile';
+      var isDesktop = window.innerWidth >= BREAKPOINT;
+      var layout = isDesktop ? 'desktop' : 'mobile';
       if(layout === currentLayout) return;
       currentLayout = layout;
 
@@ -2070,11 +2083,11 @@
         window.__initMobile && window.__initMobile();
       }
 
-      const note = document.getElementById('layoutNote');
+      var note = document.getElementById('layoutNote');
       note.textContent = isDesktop ? '💻 PC 레이아웃' : '📱 모바일 레이아웃';
       note.style.display = 'block';
       clearTimeout(applyLayout._t);
-      applyLayout._t = setTimeout(()=>{ note.style.display='none'; }, 1800);
+      applyLayout._t = setTimeout(function(){ note.style.display='none'; }, 1800);
     }
 
     window.addEventListener('resize', applyLayout);
@@ -2083,8 +2096,8 @@
   })();
 
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js').catch(err => {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('./service-worker.js').catch(function(err) {
         console.warn('Service worker registration failed:', err);
       });
     });
