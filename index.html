@@ -1409,9 +1409,85 @@
     showToast._t = setTimeout(()=>toast.classList.remove('show'), 2200);
   }
 
-  // ---------- storage (shared with desktop version: same keys) ----------
+   // ---------- storage (shared with desktop version: same keys) ----------
+  const TEAM_KEY = 'team-B';
   const memoryFallback = {};
-  const LS_PREFIX = 'team-schedule-B::';
+  const LS_PREFIX = 'team-schedule::';
+  let firebaseDb = null;
+  let isFirebaseSyncing = false;
+
+  function safeDbKey(key) {
+    return key.replace(/\./g, '__dot__')
+              .replace(/#/g, '__hash__')
+              .replace(/\$/g, '__dollar__')
+              .replace(/\[/g, '__lbr__')
+              .replace(/\]/g, '__rbr__')
+              .replace(/\//g, '__slash__');
+  }
+
+  function restoreDbKey(dbKey) {
+    return dbKey.replace(/__dot__/g, '.')
+                .replace(/__hash__/g, '#')
+                .replace(/__dollar__/g, '$')
+                .replace(/__lbr__/g, '[')
+                .replace(/__rbr__/g, ']')
+                .replace(/__slash__/g, '/');
+  }
+
+  function getFbConfig() {
+    try {
+      const v = localStorage.getItem('fb-config-json');
+      if (v) return JSON.parse(v);
+    } catch(e){}
+    return null;
+  }
+
+  function updateFbStatusText(msg, isSuccess) {
+    const el = document.getElementById('m-fbStatus');
+    if (el) {
+      el.textContent = "연동 상태: " + msg;
+      el.style.color = isSuccess ? "var(--sat)" : "var(--ink-soft)";
+    }
+  }
+
+  function initFirebaseSync(renderCb) {
+    const cfg = getFbConfig();
+    if (!cfg || !cfg.databaseURL) {
+      updateFbStatusText("로컬 저장소 전용 (연동 설정 필요)", false);
+      return;
+    }
+    try {
+      if (window.firebase) {
+        if (!firebase.apps.length) {
+          firebase.initializeApp({
+            apiKey: cfg.apiKey || "dummy-key",
+            databaseURL: cfg.databaseURL
+          });
+        }
+        firebaseDb = firebase.database();
+        updateFbStatusText("☁ Firebase 실시간 동기화 완료!", true);
+
+        firebaseDb.ref(TEAM_KEY).on('value', (snapshot) => {
+          const val = snapshot.val();
+          if (val) {
+            isFirebaseSyncing = true;
+            Object.keys(val).forEach(dbKey => {
+              const originalKey = restoreDbKey(dbKey);
+              const stringVal = typeof val[dbKey] === 'object' ? JSON.stringify(val[dbKey]) : String(val[dbKey]);
+              memoryFallback[originalKey] = stringVal;
+              lsSet(originalKey, stringVal);
+            });
+            isFirebaseSyncing = false;
+            if (renderCb) renderCb();
+          }
+        });
+      }
+    } catch(e) {
+      console.warn("Firebase Init Error", e);
+      updateFbStatusText("연동 실패: " + e.message, false);
+    }
+  }
+
   function lsGet(key){ try{ const v = localStorage.getItem(LS_PREFIX+key); return v===null?undefined:v; }catch(e){ return undefined; } }
   function lsSet(key,value){ try{ localStorage.setItem(LS_PREFIX+key, value); }catch(e){} }
   async function storageGet(key, shared){
@@ -1424,6 +1500,15 @@
     memoryFallback[key] = value;
     lsSet(key, value);
     try{ if(window.storage){ await window.storage.set(key, value, shared); } }catch(e){}
+
+    if (firebaseDb && !isFirebaseSyncing) {
+      try {
+        const dbKey = safeDbKey(key);
+        let parsedVal = value;
+        try { parsedVal = JSON.parse(value); } catch(e){}
+        firebaseDb.ref(TEAM_KEY + '/' + dbKey).set(parsedVal);
+      } catch(e) { console.warn("Firebase Save Error", e); }
+    }
   }
 
   const KOREAN_HOLIDAYS = {
@@ -1467,28 +1552,23 @@
     return list.filter(([d])=>d.startsWith(prefix)).map(([d])=>d);
   }
 
-  async function loadStaffNames(){
-    const v = await storageGet('b-staff-names', true);
-    if(v){
-      try{
-        const arr = typeof v === 'object' ? v : JSON.parse(v);
-        if(Array.isArray(arr) && arr.length === STAFF_COUNT) state.staffNames = arr;
-      }catch(e){}
-    }
+ async function loadStaffNames(){
+    const v = await storageGet('staff-names', true);
+    if(v){ try{ const arr = typeof v === 'object' ? v : JSON.parse(v); if(Array.isArray(arr) && arr.length === STAFF_COUNT) state.staffNames = arr; }catch(e){} }
   }
-  async function saveStaffNames(){ await storageSet('b-staff-names', JSON.stringify(state.staffNames), true); }
+  async function saveStaffNames(){ await storageSet('staff-names', JSON.stringify(state.staffNames), true); }
   async function loadMonthData(){
     try {
       const v = await storageGet(monthKey(state.year, state.month), true);
       if(v){
         try{
-          const parsed = (v !== null && typeof v === 'object') ? v : JSON.parse(v);
+          const parsed = typeof v === 'object' ? v : JSON.parse(v);
           let selections = parsed.selections || {};
           Object.keys(selections).forEach(k=>{
             selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
           });
           state.monthData = {
-            legalHolidays: parsed.legalHolidays || parsed.holidays || autoFillLegalHolidays(state.year,state.month),
+            legalHolidays: parsed.legalHolidays || parsed.holidays || autoFillLegalHolidays(state.year, state.month),
             tempHolidays: parsed.tempHolidays || [],
             selections, fixedOverrides: parsed.fixedOverrides || {}
           };
@@ -1504,7 +1584,6 @@
     await storageSet(monthKey(state.year, state.month), JSON.stringify(state.monthData), true);
     delete monthDataCache[`${state.year}-${pad(state.month)}`];
   }
-
 
   function classify(y,m,d){
     const dow = new Date(y, m-1, d).getDay();
@@ -1996,7 +2075,6 @@
     render();
   };
 })();
-
 
 </script>
 
