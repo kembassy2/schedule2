@@ -50,7 +50,7 @@
   .month-nav button:not(.btn):hover{background:var(--accent-soft);color:var(--accent-strong);}
   .month-label{min-width:96px;text-align:center;font-weight:700;font-size:16px;}
 
-  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:10px;margin-bottom:20px;}
   .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px;}
   .stat-card .label{font-size:11px;color:var(--ink-soft);font-weight:600;margin-bottom:4px;}
   .stat-card .value{font-size:20px;font-weight:800;}
@@ -60,6 +60,20 @@
   .stat-card.accent .value{color:#fff;font-size:14px;line-height:1.4;}
   .stat-card.highlight{background:var(--accent-soft);border-color:var(--accent);}
   .stat-card.highlight .value{color:var(--accent-strong);}
+  .stat-card.today-card{
+    background: linear-gradient(135deg, #2C5F6F 0%, #1E4652 100%);
+    border-color: #1E4652;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .stat-card.today-card:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(30,70,82,0.25);
+  }
+  .stat-card.today-card .label{ color: #CFE3E7; }
+  .stat-card.today-card .value{ color: #fff; }
+  .stat-card.today-card .sub{ color: #E4EEF0; }
 
   .panels{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
   .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;}
@@ -333,6 +347,30 @@
   .roster-item .rcount{font-size:14px;color:#5B6472;white-space:nowrap;}
   .roster-item .rcount strong{color:var(--accent-strong,#3D2B52);}
 
+  /* 오늘 근무자 팝업 모달 전용 스타일 */
+  .worker-modal-sheet{background:#fff;width:100%;max-width:540px;margin:auto;border-radius:18px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 12px 36px rgba(0,0,0,.28);overflow:hidden;}
+  .worker-date-bar{display:flex;align-items:center;justify-content:space-between;background:var(--accent-soft,#F0EAFB);padding:8px 12px;border-radius:10px;margin-bottom:12px;}
+  .worker-date-bar button{background:#fff;border:1px solid #E4E7EC;border-radius:6px;width:30px;height:30px;font-size:16px;font-weight:700;cursor:pointer;color:var(--accent-strong,#3D2B52);}
+  .worker-date-bar .date-txt{font-weight:800;font-size:16px;color:var(--accent-strong,#3D2B52);}
+  .worker-summary-box{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .worker-sum-item{padding:10px 12px;border-radius:10px;text-align:center;}
+  .worker-sum-item.work{background:#F0EAFB;border:1px solid #6C4A8C;}
+  .worker-sum-item.off{background:#F6F7F9;border:1px solid #E4E7EC;}
+  .worker-sum-item .s-label{font-size:12px;font-weight:700;color:#5B6472;}
+  .worker-sum-item .s-val{font-size:22px;font-weight:800;color:var(--accent-strong,#3D2B52);margin-top:2px;}
+  .worker-section-title{font-size:14px;font-weight:800;margin:12px 0 6px;color:var(--accent-strong,#3D2B52);display:flex;align-items:center;justify-content:space-between;}
+  .worker-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:6px;}
+  .w-chip{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #E4E7EC;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;}
+  .w-chip.work{background:#F0EAFB;border-color:#D8C7F0;color:var(--accent-strong,#3D2B52);}
+  .w-chip.jotoe{background:#FEF4E6;border-color:#FCD8A5;color:#B8792C;}
+  .w-chip.off{background:#F6F7F9;border-color:#E4E7EC;color:#5B6472;}
+  .w-chip .w-tag{font-size:10px;padding:1px 5px;border-radius:4px;font-weight:800;}
+  .w-chip.work .w-tag{background:var(--accent-strong,#3D2B52);color:#fff;}
+  .w-chip.jotoe .w-tag{background:#B8792C;color:#fff;}
+  .w-chip.off .w-tag{background:#8A94A6;color:#fff;}
+  .copy-worker-btn{background:var(--accent,#6C4A8C);color:#fff;border:none;border-radius:8px;padding:9px 12px;font-size:13.5px;font-weight:700;cursor:pointer;width:100%;margin-top:14px;display:flex;align-items:center;justify-content:center;gap:6px;}
+  .copy-worker-btn:hover{background:var(--accent-strong,#3D2B52);}
+
 </style>
 </head>
 <body>
@@ -403,7 +441,8 @@
   </div>
 
   <div id="tab-board" style="display:none;">
-    <div class="toolbar">
+    <div class="toolbar" style="display:flex;justify-content:space-between;align-items:center;">
+      <button class="btn" id="boardTodayWorkerBtn" style="display:inline-flex;align-items:center;gap:5px;background:var(--accent-strong,#3D2B52);">👥 오늘 근무자 명단 팝업</button>
       <button class="btn ghost" id="printBtn">인쇄</button>
     </div>
     <div id="boardBlocks"></div>
@@ -490,6 +529,51 @@
         </div>
         <div id="m-fbStatus" class="note" style="margin-top:6px;font-weight:700;">연동 상태: 로컬 저장소 사용 중</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="todayWorkerOverlay" style="display:none;">
+  <div class="worker-modal-sheet">
+    <div class="modal-header" style="background:var(--accent-strong,#3D2B52);color:#fff;">
+      <span style="display:flex;align-items:center;gap:6px;">👥 오늘 근무자 명단 (B조)</span>
+      <button id="closeWorkerModalBtn" style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:8px;width:30px;height:30px;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+    <div class="modal-body" style="padding:16px;">
+      <div class="worker-date-bar">
+        <button id="workerPrevDayBtn" title="이전 날짜">‹</button>
+        <div style="text-align:center;">
+          <div class="date-txt" id="workerModalDateTxt">2026.09.19 (토)</div>
+          <span id="workerModalCatBadge" style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--accent-strong,#3D2B52);color:#fff;display:inline-block;margin-top:2px;">정상근무일</span>
+        </div>
+        <button id="workerNextDayBtn" title="다음 날짜">›</button>
+      </div>
+
+      <div class="worker-summary-box">
+        <div class="worker-sum-item work">
+          <div class="s-label">🟢 출근 근무자</div>
+          <div class="s-val" id="workerModalWorkCount">0명</div>
+        </div>
+        <div class="worker-sum-item off">
+          <div class="s-label">⚪ 휴무 / 부재자</div>
+          <div class="s-val" id="workerModalOffCount">0명</div>
+        </div>
+      </div>
+
+      <div class="worker-section-title">
+        <span>출근 직원 명단</span>
+        <button id="workerTodayJumpBtn" style="background:none;border:1px solid var(--accent-strong,#3D2B52);color:var(--accent-strong,#3D2B52);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;">오늘로 이동</button>
+      </div>
+      <div class="worker-grid" id="workerModalWorkGrid"></div>
+
+      <div class="worker-section-title" style="margin-top:16px;">
+        <span>휴무 / 부재 직원 명단</span>
+      </div>
+      <div class="worker-grid" id="workerModalOffGrid"></div>
+
+      <button class="copy-worker-btn" id="copyWorkerListBtn">
+        <span>📋 근무자 명단 텍스트 복사</span>
+      </button>
     </div>
   </div>
 </div>
@@ -773,15 +857,76 @@
     renderPayroll();
   }
 
+  function getWorkersForDate(y, m, d){
+    const c = classify(y, m, d);
+    const dateStr = `${y}년 ${m}월 ${d}일 (${DOW[c.dow]})`;
+    const workingList = [];
+    const offList = [];
+
+    for(let i=0; i<STAFF_COUNT; i++){
+      const name = state.staffNames[i];
+      if(c.isFixedWeekly){
+        const ov = state.monthData.fixedOverrides[c.key] || {};
+        const v = ov[i];
+        const type = v ? (typeof v==='object' ? v.type : v) : '정기휴무';
+        const hours = v ? (typeof v==='object' ? (v.hours||1) : (type==='조퇴'?1:0)) : 0;
+        if(type === '대체'){
+          workingList.push({ idx: i, name, type: '대체근무', tag: '대체', cls: 'work' });
+        } else if(type === '조퇴'){
+          workingList.push({ idx: i, name, type: '조퇴', tag: `조퇴 ${hours}h`, cls: 'jotoe', hours });
+        } else {
+          offList.push({ idx: i, name, type: type || '정기휴무', tag: type || '정기휴무', cls: 'off' });
+        }
+      } else if(c.isTemp){
+        offList.push({ idx: i, name, type: '대체휴일', tag: '대체휴일', cls: 'off' });
+      } else {
+        const entries = state.monthData.selections[c.key] || [];
+        const mine = entries.find(e => e.idx === i);
+        if(!mine){
+          const tag = c.isLegal ? '공휴일근무' : '정상출근';
+          workingList.push({ idx: i, name, type: tag, tag, cls: 'work' });
+        } else if(mine.type === '조퇴'){
+          const hrs = mine.hours || 1;
+          workingList.push({ idx: i, name, type: '조퇴', tag: `조퇴 ${hrs}h`, cls: 'jotoe', hours: hrs });
+        } else {
+          offList.push({ idx: i, name, type: mine.type, tag: mine.type, cls: 'off' });
+        }
+      }
+    }
+    return { y, m, d, dateStr, c, workingList, offList };
+  }
+
   function renderStats(){
     const s = computeStats();
+    const now = new Date();
+    const isCurMonth = (now.getFullYear() === state.year && (now.getMonth()+1) === state.month);
+    const targetDay = isCurMonth ? now.getDate() : 1;
+    const info = getWorkersForDate(state.year, state.month, targetDay);
+    const dayLabel = isCurMonth ? `오늘(${now.getMonth()+1}/${now.getDate()})` : `${state.month}/1일`;
+    const namesPreview = info.workingList.length === 0 ? '출근자 없음' : info.workingList.map(w => w.name).join(', ');
+
     document.getElementById('statsRow').innerHTML = `
       <div class="stat-card"><div class="label">목·금 정기휴무</div><div class="value">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
       <div class="stat-card highlight"><div class="label">추가 휴무일 (참고)</div><div class="value">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금 제외</div></div>
       <div class="stat-card"><div class="label">법정공휴일</div><div class="value">${s.legal}일</div></div>
       <div class="stat-card"><div class="label">대체휴일</div><div class="value">${s.temp}일</div></div>
       <div class="stat-card"><div class="label">근무일수</div><div class="value">${s.workdays}일</div></div>
+      <div class="stat-card today-card" id="pcTodayWorkerCard" title="클릭하여 전체 명단 팝업 열기">
+        <div class="label" style="display:flex;justify-content:space-between;align-items:center;">
+          <span>👥 ${dayLabel} 근무자</span>
+          <span style="font-size:10px;background:rgba(255,255,255,0.25);padding:1px 5px;border-radius:4px;font-weight:700;">팝업 ↗</span>
+        </div>
+        <div class="value" style="font-size:19px;">${info.workingList.length}명 <span style="font-size:12px;opacity:0.85;font-weight:normal;">/ ${STAFF_COUNT}명</span></div>
+        <div class="sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${namesPreview}">${namesPreview}</div>
+      </div>
     `;
+
+    const cardEl = document.getElementById('pcTodayWorkerCard');
+    if(cardEl){
+      cardEl.addEventListener('click', () => {
+        if(window.__openTodayWorkerModal) window.__openTodayWorkerModal(new Date(state.year, state.month-1, targetDay));
+      });
+    }
   }
 
   function renderHolidayChips(){
@@ -1409,10 +1554,10 @@
     showToast._t = setTimeout(()=>toast.classList.remove('show'), 2200);
   }
 
-   // ---------- storage (shared with desktop version: same keys) ----------
+  // ---------- storage (shared with desktop version: same keys) ----------
   const TEAM_KEY = 'team-B';
   const memoryFallback = {};
-  const LS_PREFIX = 'team-schedule::';
+  const LS_PREFIX = 'team-schedule-B::';
   let firebaseDb = null;
   let isFirebaseSyncing = false;
 
@@ -1552,23 +1697,28 @@
     return list.filter(([d])=>d.startsWith(prefix)).map(([d])=>d);
   }
 
- async function loadStaffNames(){
-    const v = await storageGet('staff-names', true);
-    if(v){ try{ const arr = typeof v === 'object' ? v : JSON.parse(v); if(Array.isArray(arr) && arr.length === STAFF_COUNT) state.staffNames = arr; }catch(e){} }
+  async function loadStaffNames(){
+    const v = await storageGet('b-staff-names', true);
+    if(v){
+      try{
+        const arr = typeof v === 'object' ? v : JSON.parse(v);
+        if(Array.isArray(arr) && arr.length === STAFF_COUNT) state.staffNames = arr;
+      }catch(e){}
+    }
   }
-  async function saveStaffNames(){ await storageSet('staff-names', JSON.stringify(state.staffNames), true); }
+  async function saveStaffNames(){ await storageSet('b-staff-names', JSON.stringify(state.staffNames), true); }
   async function loadMonthData(){
     try {
       const v = await storageGet(monthKey(state.year, state.month), true);
       if(v){
         try{
-          const parsed = typeof v === 'object' ? v : JSON.parse(v);
+          const parsed = (v !== null && typeof v === 'object') ? v : JSON.parse(v);
           let selections = parsed.selections || {};
           Object.keys(selections).forEach(k=>{
             selections[k] = (selections[k]||[]).map(e => typeof e === 'number' ? {idx:e, type:'월차'} : e);
           });
           state.monthData = {
-            legalHolidays: parsed.legalHolidays || parsed.holidays || autoFillLegalHolidays(state.year, state.month),
+            legalHolidays: parsed.legalHolidays || parsed.holidays || autoFillLegalHolidays(state.year,state.month),
             tempHolidays: parsed.tempHolidays || [],
             selections, fixedOverrides: parsed.fixedOverrides || {}
           };
@@ -1584,6 +1734,7 @@
     await storageSet(monthKey(state.year, state.month), JSON.stringify(state.monthData), true);
     delete monthDataCache[`${state.year}-${pad(state.month)}`];
   }
+
 
   function classify(y,m,d){
     const dow = new Date(y, m-1, d).getDay();
@@ -1700,15 +1851,76 @@
     return {thu,fri,fixedTotal,sat,sun,legal,temp,legalForCompare,tempForCompare,workdays,comparePool,baseExtraOff,extraOff};
   }
 
+  function getWorkersForDate(y, m, d){
+    const c = classify(y, m, d);
+    const dateStr = `${y}년 ${m}월 ${d}일 (${DOW[c.dow]})`;
+    const workingList = [];
+    const offList = [];
+
+    for(let i=0; i<STAFF_COUNT; i++){
+      const name = state.staffNames[i];
+      if(c.isFixedWeekly){
+        const ov = state.monthData.fixedOverrides[c.key] || {};
+        const v = ov[i];
+        const type = v ? (typeof v==='object' ? v.type : v) : '정기휴무';
+        const hours = v ? (typeof v==='object' ? (v.hours||1) : (type==='조퇴'?1:0)) : 0;
+        if(type === '대체'){
+          workingList.push({ idx: i, name, type: '대체근무', tag: '대체', cls: 'work' });
+        } else if(type === '조퇴'){
+          workingList.push({ idx: i, name, type: '조퇴', tag: `조퇴 ${hours}h`, cls: 'jotoe', hours });
+        } else {
+          offList.push({ idx: i, name, type: type || '정기휴무', tag: type || '정기휴무', cls: 'off' });
+        }
+      } else if(c.isTemp){
+        offList.push({ idx: i, name, type: '대체휴일', tag: '대체휴일', cls: 'off' });
+      } else {
+        const entries = state.monthData.selections[c.key] || [];
+        const mine = entries.find(e => e.idx === i);
+        if(!mine){
+          const tag = c.isLegal ? '공휴일근무' : '정상출근';
+          workingList.push({ idx: i, name, type: tag, tag, cls: 'work' });
+        } else if(mine.type === '조퇴'){
+          const hrs = mine.hours || 1;
+          workingList.push({ idx: i, name, type: '조퇴', tag: `조퇴 ${hrs}h`, cls: 'jotoe', hours: hrs });
+        } else {
+          offList.push({ idx: i, name, type: mine.type, tag: mine.type, cls: 'off' });
+        }
+      }
+    }
+    return { y, m, d, dateStr, c, workingList, offList };
+  }
+
   function renderTopStats(){
     const s = computeStats();
+    const now = new Date();
+    const isCurMonth = (now.getFullYear() === state.year && (now.getMonth()+1) === state.month);
+    const targetDay = isCurMonth ? now.getDate() : 1;
+    const info = getWorkersForDate(state.year, state.month, targetDay);
+    const dayLabel = isCurMonth ? `오늘(${now.getMonth()+1}/${now.getDate()})` : `${state.month}/1일`;
+    const namesPreview = info.workingList.length === 0 ? '출근자 없음' : info.workingList.map(w => w.name).join(', ');
+
     document.getElementById('topStats').innerHTML = `
       <div class="tcard"><div class="l">목·금 정기휴무</div><div class="v">${s.fixedTotal}일</div><div class="sub">목 ${s.thu} · 금 ${s.fri}</div></div>
       <div class="tcard highlight"><div class="l">추가 휴무일 (참고)</div><div class="v">${s.extraOff}일</div><div class="sub">(토${s.sat}+일${s.sun}+공휴일${s.legalForCompare}=${s.comparePool}) − 목금${s.fixedTotal} = ${s.baseExtraOff}일<br>+ 등록된 대체휴일 ${s.temp}일 = ${s.extraOff}일<br>공휴일은 토·일·목·금 제외</div></div>
       <div class="tcard"><div class="l">법정공휴일</div><div class="v">${s.legal}일</div></div>
       <div class="tcard"><div class="l">대체휴일</div><div class="v">${s.temp}일</div></div>
       <div class="tcard"><div class="l">근무일수</div><div class="v">${s.workdays}일</div></div>
+      <div class="tcard wide" id="m-todayWorkerCard" style="cursor:pointer;background:linear-gradient(135deg, #2C5F6F, #1E4652);color:#fff;border-color:#1E4652;">
+        <div class="l" style="color:#CFE3E7;display:flex;justify-content:space-between;align-items:center;">
+          <span>👥 ${dayLabel} 근무자 명단</span>
+          <span style="font-size:11px;background:rgba(255,255,255,0.25);color:#fff;padding:2px 7px;border-radius:6px;font-weight:700;">상세 팝업 ↗</span>
+        </div>
+        <div class="v" style="color:#fff;font-size:20px;margin:2px 0 3px;">출근 ${info.workingList.length}명 <span style="font-size:13px;font-weight:500;opacity:0.85;">(휴무 ${info.offList.length}명)</span></div>
+        <div class="sub" style="color:#E4EEF0;font-size:13px;line-height:1.4;">${namesPreview}</div>
+      </div>
     `;
+
+    const mCard = document.getElementById('m-todayWorkerCard');
+    if(mCard){
+      mCard.addEventListener('click', () => {
+        if(window.__openTodayWorkerModal) window.__openTodayWorkerModal(new Date(state.year, state.month-1, targetDay));
+      });
+    }
   }
 
   function render(){
@@ -2076,6 +2288,7 @@
   };
 })();
 
+
 </script>
 
 <script>
@@ -2097,6 +2310,126 @@
       }
       overlay.style.display = 'flex';
     };
+
+    /* ── 오늘 근무자 모달 전역 제어 (B조) ── */
+    var workerCurrentDate = new Date();
+
+    window.__openTodayWorkerModal = function(targetDate){
+      if(targetDate instanceof Date) workerCurrentDate = new Date(targetDate);
+      else workerCurrentDate = new Date();
+      renderWorkerModal();
+      var overlay = document.getElementById('todayWorkerOverlay');
+      if(overlay) overlay.style.display = 'flex';
+    };
+
+    function renderWorkerModal(){
+      var y = workerCurrentDate.getFullYear();
+      var m = workerCurrentDate.getMonth() + 1;
+      var d = workerCurrentDate.getDate();
+      var dow = workerCurrentDate.getDay();
+      var DOW = ['일','월','화','수','목','금','토'];
+      var key = y + '-' + String(m).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+
+      // 로컬 스토리지에서 해당 월 데이터 읽기 (접두사 team-schedule-B::)
+      var raw = localStorage.getItem('team-schedule-B::month-data:' + y + '-' + String(m).padStart(2,'0'));
+      var mData = { legalHolidays: [], tempHolidays: [], selections: {}, fixedOverrides: {} };
+      if(raw){
+        try{ mData = JSON.parse(raw); }catch(e){}
+      }
+      var staffRaw = localStorage.getItem('team-schedule-B::b-staff-names');
+      var staffNames = Array.from({length:15}, function(_,i){ return '직원' + (i+1); });
+      if(staffRaw){
+        try{ var arr = JSON.parse(staffRaw); if(Array.isArray(arr)) staffNames = arr; }catch(e){}
+      }
+
+      var isFixedWeekly = (dow === 4 || dow === 5); // B조 목/금
+      var isLegal = (mData.legalHolidays || []).indexOf(key) !== -1;
+      var isTemp = (mData.tempHolidays || []).indexOf(key) !== -1;
+
+      var categoryBadge = '정상근무일';
+      if(isFixedWeekly) categoryBadge = '정기휴무(목·금)';
+      else if(isTemp) categoryBadge = '대체휴일';
+      else if(isLegal) categoryBadge = '법정공휴일';
+
+      var workingList = [];
+      var offList = [];
+
+      for(var i=0; i<15; i++){
+        var name = staffNames[i] || ('직원' + (i+1));
+        if(isFixedWeekly){
+          var ov = (mData.fixedOverrides || {})[key] || {};
+          var v = ov[i];
+          var type = v ? (typeof v === 'object' ? v.type : v) : '정기휴무';
+          var hours = v ? (typeof v === 'object' ? (v.hours || 1) : (type==='조퇴'?1:0)) : 0;
+          if(type === '대체'){
+            workingList.push({ name: name, tag: '대체', cls: 'work' });
+          } else if(type === '조퇴'){
+            workingList.push({ name: name, tag: '조퇴 ' + hours + 'h', cls: 'jotoe' });
+          } else {
+            offList.push({ name: name, tag: type || '정기휴무', cls: 'off' });
+          }
+        } else if(isTemp){
+          offList.push({ name: name, tag: '대체휴일', cls: 'off' });
+        } else {
+          var entries = (mData.selections || {})[key] || [];
+          var mine = entries.find ? entries.find(function(e){ return e.idx === i; }) : null;
+          if(!mine){
+            var tag = isLegal ? '공휴일근무' : '정상출근';
+            workingList.push({ name: name, tag: tag, cls: 'work' });
+          } else if(mine.type === '조퇴'){
+            var hrs = mine.hours || 1;
+            workingList.push({ name: name, tag: '조퇴 ' + hrs + 'h', cls: 'jotoe' });
+          } else {
+            offList.push({ name: name, tag: mine.type, cls: 'off' });
+          }
+        }
+      }
+
+      var dateTxtEl = document.getElementById('workerModalDateTxt');
+      if(dateTxtEl) dateTxtEl.textContent = y + '.' + String(m).padStart(2,'0') + '.' + String(d).padStart(2,'0') + ' (' + DOW[dow] + ')';
+
+      var catBadgeEl = document.getElementById('workerModalCatBadge');
+      if(catBadgeEl){
+        catBadgeEl.textContent = categoryBadge;
+        catBadgeEl.style.background = isFixedWeekly ? '#8A94A6' : (isLegal ? '#B8792C' : (isTemp ? '#7C5CBF' : '#3D2B52'));
+      }
+
+      var workCountEl = document.getElementById('workerModalWorkCount');
+      if(workCountEl) workCountEl.textContent = workingList.length + '명';
+
+      var offCountEl = document.getElementById('workerModalOffCount');
+      if(offCountEl) offCountEl.textContent = offList.length + '명';
+
+      var workGrid = document.getElementById('workerModalWorkGrid');
+      if(workGrid){
+        workGrid.innerHTML = workingList.length === 0 ? '<div style="grid-column:1/-1;color:#8A94A6;font-size:13px;padding:8px 0;text-align:center;">출근 근무자가 없습니다.</div>' :
+          workingList.map(function(w){ return '<div class="w-chip ' + w.cls + '"><span>' + w.name + '</span><span class="w-tag">' + w.tag + '</span></div>'; }).join('');
+      }
+
+      var offGrid = document.getElementById('workerModalOffGrid');
+      if(offGrid){
+        offGrid.innerHTML = offList.length === 0 ? '<div style="grid-column:1/-1;color:#8A94A6;font-size:13px;padding:8px 0;text-align:center;">휴무 직원이 없습니다.</div>' :
+          offList.map(function(w){ return '<div class="w-chip ' + w.cls + '"><span>' + w.name + '</span><span class="w-tag">' + w.tag + '</span></div>'; }).join('');
+      }
+
+      var copyBtn = document.getElementById('copyWorkerListBtn');
+      if(copyBtn){
+        copyBtn.onclick = function(){
+          var workNames = workingList.map(function(w){ return (w.tag === '정상출근' || w.tag === '공휴일근무') ? w.name : (w.name + '(' + w.tag + ')'); }).join(', ') || '없음';
+          var offNames = offList.map(function(w){ return w.name + '(' + w.tag + ')'; }).join(', ') || '없음';
+          var text = '[B조 ' + y + '년 ' + m + '월 ' + d + '일 (' + DOW[dow] + ') 근무자 현황]\n- 구분: ' + categoryBadge + '\n- 출근(' + workingList.length + '명): ' + workNames + '\n- 휴무(' + offList.length + '명): ' + offNames;
+          if(navigator.clipboard && navigator.clipboard.writeText){
+            navigator.clipboard.writeText(text).then(function(){
+              alert('근무자 명단이 클립보드에 복사되었습니다!\n(카톡 등에 붙여넣기 가능)');
+            }).catch(function(){
+              prompt('아래 텍스트를 복사하세요:', text);
+            });
+          } else {
+            prompt('아래 텍스트를 복사하세요:', text);
+          }
+        };
+      }
+    }
 
     function setupGlobalModalEvents(){
       var overlay  = document.getElementById('m-settingsOverlay');
@@ -2128,6 +2461,46 @@
           localStorage.setItem('fb-config-json', JSON.stringify(config));
           alert('Firebase 설정이 저장되었습니다. 앱을 다시 시작합니다.');
           location.reload();
+        });
+      }
+
+      /* 오늘 근무자 모달 이벤트 연결 */
+      var wOverlay  = document.getElementById('todayWorkerOverlay');
+      var wCloseBtn = document.getElementById('closeWorkerModalBtn');
+      var wPrevBtn  = document.getElementById('workerPrevDayBtn');
+      var wNextBtn  = document.getElementById('workerNextDayBtn');
+      var wTodayBtn = document.getElementById('workerTodayJumpBtn');
+      var bWorkerBtn = document.getElementById('boardTodayWorkerBtn');
+
+      if(bWorkerBtn){
+        bWorkerBtn.addEventListener('click', function(){ window.__openTodayWorkerModal(); });
+      }
+      if(wCloseBtn){
+        wCloseBtn.addEventListener('click', function(){
+          if(wOverlay) wOverlay.style.display = 'none';
+        });
+      }
+      if(wOverlay){
+        wOverlay.addEventListener('click', function(e){
+          if(e.target === wOverlay) wOverlay.style.display = 'none';
+        });
+      }
+      if(wPrevBtn){
+        wPrevBtn.addEventListener('click', function(){
+          workerCurrentDate.setDate(workerCurrentDate.getDate() - 1);
+          renderWorkerModal();
+        });
+      }
+      if(wNextBtn){
+        wNextBtn.addEventListener('click', function(){
+          workerCurrentDate.setDate(workerCurrentDate.getDate() + 1);
+          renderWorkerModal();
+        });
+      }
+      if(wTodayBtn){
+        wTodayBtn.addEventListener('click', function(){
+          workerCurrentDate = new Date();
+          renderWorkerModal();
         });
       }
     }
